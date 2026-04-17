@@ -38,10 +38,13 @@ import { registerUser } from "../services/registration-service";
 
 type TransitionDirection = "forward" | "backward";
 type FeedbackState = "idle" | "success" | "error";
+type RegisterScreenProps = {
+  onNavigateToLogin?: () => void;
+};
 
 const today = new Date();
 
-export default function RegisterScreen() {
+export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProps) {
   const { width } = useWindowDimensions();
   const draft = useRegistrationStore((state) => state.draft);
   const currentStep = useRegistrationStore((state) => state.currentStep);
@@ -348,6 +351,16 @@ export default function RegisterScreen() {
                 </Pressable>
               )}
             </View>
+
+            {onNavigateToLogin ? (
+              <Pressable
+                onPress={onNavigateToLogin}
+                style={styles.switchAuthAction}
+                disabled={isSubmitting}
+              >
+                <Text style={styles.switchAuthText}>Ja possui conta? Entrar</Text>
+              </Pressable>
+            ) : null}
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -469,5 +482,16 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: "#35506B",
+  },
+  switchAuthAction: {
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 40,
+  },
+  switchAuthText: {
+    color: "#2C7BE5",
+    fontSize: 14,
+    fontWeight: "700",
   },
 });
