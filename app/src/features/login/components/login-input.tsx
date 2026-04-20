@@ -1,11 +1,10 @@
-import { useState, type Ref } from "react";
+import { useState } from "react";
 import {
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   type KeyboardTypeOptions,
-  type ReturnKeyTypeOptions,
   type TextInputProps,
   View,
 } from "react-native";
@@ -21,10 +20,6 @@ type LoginInputProps = {
   autoCapitalize?: TextInputProps["autoCapitalize"];
   autoCorrect?: boolean;
   isPassword?: boolean;
-  returnKeyType?: ReturnKeyTypeOptions;
-  onSubmitEditing?: TextInputProps["onSubmitEditing"];
-  blurOnSubmit?: TextInputProps["blurOnSubmit"];
-  inputRef?: Ref<TextInput>;
 };
 
 export function LoginInput({
@@ -36,12 +31,7 @@ export function LoginInput({
   autoCapitalize = "sentences",
   autoCorrect = false,
   isPassword = false,
-  returnKeyType,
-  onSubmitEditing,
-  blurOnSubmit = false,
-  inputRef,
 }: LoginInputProps) {
-  const [isFocused, setIsFocused] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
   return (
@@ -51,21 +41,10 @@ export function LoginInput({
       render={({ field: { onBlur, onChange, value }, fieldState: { error } }) => (
         <View style={styles.wrapper}>
           <Text style={styles.label}>{label}</Text>
-          <View
-            style={[
-              styles.inputContainer,
-              isFocused ? styles.inputFocused : undefined,
-              error ? styles.inputError : undefined,
-            ]}
-          >
+          <View style={[styles.inputContainer, error ? styles.inputError : undefined]}>
             <TextInput
-              ref={inputRef}
               value={value}
-              onBlur={() => {
-                setIsFocused(false);
-                onBlur();
-              }}
-              onFocus={() => setIsFocused(true)}
+              onBlur={onBlur}
               onChangeText={onChange}
               placeholder={placeholder}
               keyboardType={keyboardType}
@@ -74,9 +53,6 @@ export function LoginInput({
               secureTextEntry={isPassword ? !isPasswordVisible : false}
               style={styles.input}
               placeholderTextColor="#8E9AA7"
-              returnKeyType={returnKeyType}
-              onSubmitEditing={onSubmitEditing}
-              blurOnSubmit={blurOnSubmit}
             />
             {isPassword ? (
               <Pressable
@@ -116,14 +92,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-  },
-  inputFocused: {
-    borderColor: "#2C7BE5",
-    shadowColor: "#2C7BE5",
-    shadowOpacity: 0.12,
-    shadowOffset: { width: 0, height: 0 },
-    shadowRadius: 8,
-    elevation: 2,
   },
   input: {
     flex: 1,

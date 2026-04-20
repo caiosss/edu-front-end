@@ -65,7 +65,7 @@ export default function LoginScreen({ onNavigateToRegister }: LoginScreenProps) 
           >
             <Text style={styles.pageTitle}>Entrar</Text>
             <Text style={styles.pageDescription}>
-              Acesse seu plano de cuidados e acompanhe desafios diarios.
+              Acesse seu plano de cuidados e acompanhe desafios diários.
             </Text>
 
             <Animated.View entering={FadeInUp.delay(60).duration(260)} style={styles.formGroup}>
