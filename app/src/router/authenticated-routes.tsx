@@ -28,12 +28,6 @@ export const authenticatedRoutes: AuthenticatedRoute[] = [
     component: HomeScreen,
   },
   {
-    key: "loja",
-    label: "Loja",
-    icon: Store,
-    component: StoreScreen,
-  },
-  {
     key: "progresso",
     label: "Progresso",
     icon: Medal,
