@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { isBeforeDate, isDateInFuture, parseISOToDate } from "./utils/date";
+import { isBeforeDate, isDateInFuture, parseDateInputToDate } from "./utils/date";
 import { USER_TYPES, type RegistrationFormValues, type UserType } from "./types";
 
 const requiredFieldMessage = "Campo obrigatorio.";
-const validDateMessage = "Selecione uma data valida.";
+const validDateMessage = "Informe uma data valida no formato DD/MM/AAAA.";
 const validUserTypeMessage = "Selecione um tipo de usuario valido.";
 const userTypeSet = new Set<UserType>(USER_TYPES);
 
@@ -32,7 +32,7 @@ const validateDateField = (
     return false;
   }
 
-  if (!parseISOToDate(value)) {
+  if (!parseDateInputToDate(value)) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
       path: [path],

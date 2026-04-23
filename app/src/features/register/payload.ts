@@ -1,4 +1,5 @@
 import type { RegisterPayload, RegistrationFormValues, UserType } from "./types";
+import { normalizeDateToISO } from "./utils/date";
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
@@ -8,26 +9,22 @@ export const buildRegisterPayload = (
 ): RegisterPayload => {
   const payload: RegisterPayload = {
     email: normalizeEmail(values.email),
-    password: values.senha,
-    userType,
+    senha: values.senha,
+    tipoUsuario: userType,
+    nomeCompleto: userType === "PACIENTE" ? values.pacienteNomeCompleto : values.cuidadorNomeCompleto,
+    dataNascimento:
+      userType === "PACIENTE"
+        ? normalizeDateToISO(values.pacienteDataNascimento)
+        : normalizeDateToISO("1900-01-01"),
+    tipoTransplante:
+      userType === "PACIENTE" ? values.pacienteTipoTransplante : "",
+    dataTransplante:
+      userType === "PACIENTE"
+        ? normalizeDateToISO(values.pacienteDataTransplante)
+        : normalizeDateToISO("1900-01-01"),
+    telefone: userType === "CUIDADOR" ? values.cuidadorTelefone : "",
+    relacao: userType === "CUIDADOR" ? values.cuidadorRelacao : "",
   };
-
-  if (userType === "PACIENTE" || userType === "CUIDADOR") {
-    payload.patient = {
-      fullName: values.pacienteNomeCompleto.trim(),
-      birthDate: values.pacienteDataNascimento,
-      transplantType: values.pacienteTipoTransplante.trim(),
-      transplantDate: values.pacienteDataTransplante,
-    };
-  }
-
-  if (userType === "CUIDADOR") {
-    payload.caregiver = {
-      fullName: values.cuidadorNomeCompleto.trim(),
-      phone: values.cuidadorTelefone.replace(/\D/g, ""),
-      relationship: values.cuidadorRelacao.trim(),
-    };
-  }
 
   return payload;
 };

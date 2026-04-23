@@ -43,8 +43,12 @@ export type CaregiverPayload = {
 
 export type RegisterPayload = {
   email: string;
-  password: string;
-  userType: UserType;
-  patient?: PatientPayload;
-  caregiver?: CaregiverPayload;
+  senha: string;
+  tipoUsuario: UserType;
+  nomeCompleto: string;
+  dataNascimento: string;
+  tipoTransplante: string;
+  dataTransplante: string;
+  telefone: string;
+  relacao: string;
 };

@@ -21,6 +21,7 @@ type FormInputProps = {
   autoCorrect?: boolean;
   isPassword?: boolean;
   maxLength?: number;
+  valueFormatter?: (value: string) => string;
 };
 
 export function FormInput({
@@ -33,6 +34,7 @@ export function FormInput({
   autoCorrect = false,
   isPassword = false,
   maxLength,
+  valueFormatter,
 }: FormInputProps) {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
@@ -47,7 +49,9 @@ export function FormInput({
             <TextInput
               value={value}
               onBlur={onBlur}
-              onChangeText={onChange}
+              onChangeText={(text) =>
+                onChange(valueFormatter ? valueFormatter(text) : text)
+              }
               placeholder={placeholder}
               keyboardType={keyboardType}
               autoCapitalize={autoCapitalize}
