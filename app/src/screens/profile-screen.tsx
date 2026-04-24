@@ -210,7 +210,7 @@ export default function ProfileScreen() {
             <Medal size={18} color="#2C7BE5" />
             <Text style={styles.cardTitle}>Conquistas e progresso</Text>
           </View>
-          <Text style={styles.levelBadge}>Nivel {userLevel}</Text>
+          <Text style={styles.levelBadge}>Nível {userLevel}</Text>
         </View>
 
         <View style={styles.progressTrack} onLayout={handleProgressTrackLayout}>
