@@ -62,6 +62,8 @@ const extractRole = (payload: JwtPayload | null): string | null => {
 
 export function useAuth() {
   const token = useAuthStore((state) => state.token);
+  const id = useAuthStore((state) => state.id);
+  const tipoUsuario = useAuthStore((state) => state.tipoUsuario);
   const setToken = useAuthStore((state) => state.setToken);
   const clearToken = useAuthStore((state) => state.clearToken);
 
@@ -69,6 +71,8 @@ export function useAuth() {
 
   return {
     token,
+    id,
+    tipoUsuario,
     isAuthenticated: Boolean(token),
     role: extractRole(payload),
     email: asNonEmptyString(payload?.email),

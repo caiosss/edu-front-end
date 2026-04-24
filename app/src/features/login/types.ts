@@ -10,12 +10,13 @@ export const loginDefaultValues: LoginFormValues = {
 
 export type LoginPayload = {
   email: string;
-  password: string;
+  senha: string;
 };
 
 export type LoginResult = {
   token: string;
-  refreshToken?: string | null;
+  id: string;
+  tipoUsuario: string;
 };
 
 export type LoginFeedbackState = "idle" | "success" | "error";

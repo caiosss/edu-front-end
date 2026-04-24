@@ -14,8 +14,6 @@ export const registerUser = async (payload: RegisterPayload): Promise<void> => {
   }
 
   try {
-    console.log(payload)
-
     await api.post("/auth/register", payload);
   } catch (error) {
     if (axios.isAxiosError(error)) {

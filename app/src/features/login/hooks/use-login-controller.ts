@@ -3,7 +3,6 @@ import {
   isInvalidCredentialsError,
   loginUser,
 } from "../../../services/auth-service";
-import { useAuthStore } from "../../../store/auth-store";
 import { buildLoginPayload } from "../payload";
 import type { LoginFeedbackState, LoginFormValues } from "../types";
 
@@ -15,7 +14,6 @@ type LoginController = {
 };
 
 export function useLoginController(): LoginController {
-  const setToken = useAuthStore((state) => state.setToken);
   const [feedbackState, setFeedbackState] = useState<LoginFeedbackState>("idle");
   const [feedbackMessage, setFeedbackMessage] = useState("");
 
@@ -30,8 +28,7 @@ export function useLoginController(): LoginController {
 
       try {
         const payload = buildLoginPayload(values);
-        const response = await loginUser(payload);
-        setToken(response.token);
+        await loginUser(payload);
         setFeedbackState("success");
         setFeedbackMessage("Login realizado com sucesso.");
         return true;
@@ -47,7 +44,7 @@ export function useLoginController(): LoginController {
         return false;
       }
     },
-    [clearFeedback, setToken]
+    [clearFeedback]
   );
 
   return {

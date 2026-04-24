@@ -1,16 +1,9 @@
 import axios from "axios";
 import type { LoginPayload, LoginResult } from "../features/login/types";
+import { useAuthStore } from "../store/auth-store";
 import { api } from "./api";
 
 const invalidCredentialsCode = "INVALID_CREDENTIALS";
-
-const isFakeApiUrl = (baseURL: string | undefined): boolean => {
-  if (!baseURL) {
-    return true;
-  }
-
-  return /example\.com/i.test(baseURL);
-};
 
 const asNonEmptyString = (value: unknown): string | null => {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
@@ -24,19 +17,34 @@ const normalizeLoginResponse = (data: unknown): LoginResult => {
   const parsedData = data as {
     token?: unknown;
     accessToken?: unknown;
-    refreshToken?: unknown;
+    id?: unknown;
+    userId?: unknown;
+    tipoUsuario?: unknown;
+    userType?: unknown;
   };
 
   const token =
     asNonEmptyString(parsedData.token) ?? asNonEmptyString(parsedData.accessToken);
+  const id = asNonEmptyString(parsedData.id) ?? asNonEmptyString(parsedData.userId);
+  const tipoUsuario =
+    asNonEmptyString(parsedData.tipoUsuario) ?? asNonEmptyString(parsedData.userType);
 
   if (!token) {
     throw new Error("Resposta de autenticacao invalida: token ausente.");
   }
 
+  if (!id) {
+    throw new Error("Resposta de autenticacao invalida: id ausente.");
+  }
+
+  if (!tipoUsuario) {
+    throw new Error("Resposta de autenticacao invalida: tipoUsuario ausente.");
+  }
+
   return {
     token,
-    refreshToken: asNonEmptyString(parsedData.refreshToken),
+    id,
+    tipoUsuario,
   };
 };
 
@@ -64,17 +72,16 @@ export const isInvalidCredentialsError = (
 };
 
 export const loginUser = async (payload: LoginPayload): Promise<LoginResult> => {
-  // Enquanto o backend nao estiver disponivel, evita falha de rede com URL fake.
-  if (isFakeApiUrl(api.defaults.baseURL)) {
-    await new Promise((resolve) => setTimeout(resolve, 700));
-    return { token: `mock-token-${Date.now()}` };
-  }
-
   try {
     const response = await api.post("/auth/login", payload);
-    return normalizeLoginResponse(response.data);
+    const session = normalizeLoginResponse(response.data);
+    useAuthStore.getState().setSession(session);
+    return session;
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response?.status === 401) {
+    if (
+      axios.isAxiosError(error) &&
+      (error.response?.status === 401 || error.response?.status === 403)
+    ) {
       throw new InvalidCredentialsError();
     }
 
