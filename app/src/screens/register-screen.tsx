@@ -2,7 +2,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -11,7 +10,6 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { ChevronLeft } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, {
   FadeInDown,
@@ -21,18 +19,16 @@ import Animated, {
   SlideOutRight,
 } from "react-native-reanimated";
 import { useForm } from "react-hook-form";
-import { CaregiverFormFields } from "../features/register/components/caregiver-form-fields";
 import { FormInput } from "../features/register/components/form-input";
 import { ProgressIndicator } from "../features/register/components/progress-indicator";
 import { buildRegisterPayload } from "../features/register/payload";
 import { useRegistrationStore } from "../features/register/store/use-registration-store";
-import type { RegistrationFormValues, UserType } from "../features/register/types";
+import type { RegistrationFormValues } from "../features/register/types";
 import { registrationSchema } from "../features/register/validation";
 import { registerUser } from "../services/registration-service";
 
 type TransitionDirection = "forward" | "backward";
 type FeedbackState = "idle" | "success" | "error";
-type RegisterStage = "steps" | "caregiver";
 type RegisterScreenProps = {
   onNavigateToLogin?: () => void;
 };
@@ -45,16 +41,7 @@ const patientStepFields: Array<keyof RegistrationFormValues> = [
   "pacienteTipoTransplante",
   "pacienteDataTransplante",
 ];
-const caregiverOnlyFields: Array<keyof RegistrationFormValues> = [
-  "cuidadorNomeCompleto",
-  "cuidadorTelefone",
-  "cuidadorRelacao",
-];
-const caregiverSubmitFields: Array<keyof RegistrationFormValues> = [
-  "pacienteCpf",
-  "pacienteNomeCompleto",
-  ...caregiverOnlyFields,
-];
+
 const maskBrDateInput = (input: string): string => {
   const digits = input.replace(/\D/g, "").slice(0, 8);
 
@@ -98,9 +85,6 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
     useState<TransitionDirection>("forward");
   const [feedbackState, setFeedbackState] = useState<FeedbackState>("idle");
   const [feedbackMessage, setFeedbackMessage] = useState("");
-  const [registerStage, setRegisterStage] = useState<RegisterStage>("steps");
-  const [isCaregiverModalVisible, setIsCaregiverModalVisible] = useState(false);
-  const [isCaregiverLookupLoading, setIsCaregiverLookupLoading] = useState(false);
 
   const {
     control,
@@ -156,8 +140,13 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
   };
 
   const onSubmit = async (values: RegistrationFormValues) => {
-    const userType: UserType = values.tipoUsuario === "CUIDADOR" ? "CUIDADOR" : "PACIENTE";
-    const payload = buildRegisterPayload(values, userType);
+    const payload = buildRegisterPayload(
+      {
+        ...values,
+        tipoUsuario: "PACIENTE",
+      },
+      "PACIENTE"
+    );
 
     try {
       await registerUser(payload);
@@ -165,9 +154,7 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
       setFeedbackMessage("Cadastro finalizado com sucesso.");
       reset();
       setTimeout(() => {
-        if (onNavigateToLogin) {
-          onNavigateToLogin();
-        }
+        onNavigateToLogin?.();
       }, 1500);
     } catch (error) {
       setFeedbackState("error");
@@ -179,10 +166,6 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
     }
   };
 
-  const submitRegistration = async () => {
-    await handleSubmit(onSubmit)();
-  };
-
   const finalizeRegistration = async () => {
     const isStepTwoValid = await trigger(patientStepFields, {
       shouldFocus: true,
@@ -192,40 +175,12 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
       return;
     }
 
-    setIsCaregiverModalVisible(true);
-  };
-
-  const submitWithoutCaregiver = async () => {
-    setIsCaregiverModalVisible(false);
-    setFeedbackState("idle");
     setValue("tipoUsuario", "PACIENTE", {
       shouldDirty: true,
       shouldValidate: false,
     });
 
-    await submitRegistration();
-  };
-
-  const showCaregiverForm = () => {
-    setIsCaregiverModalVisible(false);
-    setFeedbackState("idle");
-    setValue("tipoUsuario", "CUIDADOR", {
-      shouldDirty: true,
-      shouldValidate: false,
-    });
-    setRegisterStage("caregiver");
-  };
-
-  const finalizeCaregiverRegistration = async () => {
-    const isCaregiverValid = await trigger(caregiverSubmitFields, {
-      shouldFocus: true,
-    });
-
-    if (!isCaregiverValid) {
-      return;
-    }
-
-    await submitRegistration();
+    await handleSubmit(onSubmit)();
   };
 
   const renderPatientFields = () => (
@@ -274,16 +229,6 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
     </View>
   );
 
-  const renderCaregiverFields = () => (
-    <CaregiverFormFields
-      control={control}
-      watch={watch}
-      setValue={setValue}
-      isSubmitting={isSubmitting}
-      onLookupLoadingChange={setIsCaregiverLookupLoading}
-    />
-  );
-
   const renderStepContent = () => {
     if (currentStep === 0) {
       return (
@@ -330,67 +275,36 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
               Fluxo guiado de registro do paciente.
             </Text>
 
-            {registerStage === "steps" ? (
-              <>
-                <ProgressIndicator
-                  currentStep={currentStep}
-                  totalSteps={2}
-                  labels={stepLabels}
-                />
+            <ProgressIndicator
+              currentStep={currentStep}
+              totalSteps={2}
+              labels={stepLabels}
+            />
 
-                <View style={styles.stepHeader}>
-                  <Text style={styles.stepTitle}>
-                    {currentStep === 0
-                      ? "Etapa 1 - Credenciais"
-                      : "Etapa 2 - Dados do paciente"}
-                  </Text>
-                </View>
+            <View style={styles.stepHeader}>
+              <Text style={styles.stepTitle}>
+                {currentStep === 0
+                  ? "Etapa 1 - Credenciais"
+                  : "Etapa 2 - Dados do paciente"}
+              </Text>
+            </View>
 
-                <Animated.View
-                  key={`steps-${currentStep}`}
-                  entering={
-                    transitionDirection === "forward"
-                      ? SlideInRight.duration(260)
-                      : SlideInLeft.duration(260)
-                  }
-                  exiting={
-                    transitionDirection === "forward"
-                      ? SlideOutLeft.duration(220)
-                      : SlideOutRight.duration(220)
-                  }
-                  style={styles.stepContainer}
-                >
-                  {renderStepContent()}
-                </Animated.View>
-              </>
-            ) : (
-              <Animated.View
-                key="caregiver-form"
-                entering={FadeInDown.duration(240)}
-                style={styles.stepContainer}
-              >
-                <View style={styles.caregiverHeader}>
-                  {onNavigateToLogin ? (
-                    <Pressable
-                      onPress={onNavigateToLogin}
-                      style={styles.chevronAction}
-                      disabled={isSubmitting}
-                    >
-                      <ChevronLeft size={20} color="#35506B" />
-                    </Pressable>
-                  ) : (
-                    <View style={styles.chevronSpacer} />
-                  )}
-                  <Text style={styles.stepTitle}>Dados do cuidador</Text>
-                </View>
-
-                <Text style={styles.caregiverDescription}>
-                  Preencha os dados para adicionar um cuidador ao paciente.
-                </Text>
-
-                {renderCaregiverFields()}
-              </Animated.View>
-            )}
+            <Animated.View
+              key={`steps-${currentStep}`}
+              entering={
+                transitionDirection === "forward"
+                  ? SlideInRight.duration(260)
+                  : SlideInLeft.duration(260)
+              }
+              exiting={
+                transitionDirection === "forward"
+                  ? SlideOutLeft.duration(220)
+                  : SlideOutRight.duration(220)
+              }
+              style={styles.stepContainer}
+            >
+              {renderStepContent()}
+            </Animated.View>
 
             {feedbackState !== "idle" ? (
               <View
@@ -414,94 +328,49 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
               </View>
             ) : null}
 
-            {registerStage === "steps" ? (
-              <View style={styles.navigationRow}>
-                {currentStep === 0 ? (
-                  <View style={styles.ghostButton} />
-                ) : (
-                  <Pressable
-                    onPress={previousStep}
-                    style={[styles.actionButton, styles.secondaryButton]}
-                    disabled={isSubmitting}
-                  >
-                    <Text style={[styles.actionText, styles.secondaryButtonText]}>Voltar</Text>
-                  </Pressable>
-                )}
-
-                {currentStep === 0 ? (
-                  <Pressable
-                    onPress={nextStep}
-                    style={[styles.actionButton, styles.primaryButton]}
-                    disabled={isSubmitting}
-                  >
-                    <Text style={[styles.actionText, styles.primaryButtonText]}>Próximo</Text>
-                  </Pressable>
-                ) : (
-                  <Pressable
-                    onPress={finalizeRegistration}
-                    style={[styles.actionButton, styles.primaryButton]}
-                    disabled={isSubmitting || feedbackState === "success"}
-                  >
-                    <Text style={[styles.actionText, styles.primaryButtonText]}>
-                      {isSubmitting ? "Finalizando..." : "Finalizar"}
-                    </Text>
-                  </Pressable>
-                )}
-              </View>
-            ) : (
-              <View style={styles.singleActionRow}>
+            <View style={styles.navigationRow}>
+              {currentStep === 0 ? (
+                <View style={styles.ghostButton} />
+              ) : (
                 <Pressable
-                  onPress={finalizeCaregiverRegistration}
+                  onPress={previousStep}
+                  style={[styles.actionButton, styles.secondaryButton]}
+                  disabled={isSubmitting}
+                >
+                  <Text style={[styles.actionText, styles.secondaryButtonText]}>Voltar</Text>
+                </Pressable>
+              )}
+
+              {currentStep === 0 ? (
+                <Pressable
+                  onPress={nextStep}
                   style={[styles.actionButton, styles.primaryButton]}
-                  disabled={
-                    isSubmitting || isCaregiverLookupLoading || feedbackState === "success"
-                  }
+                  disabled={isSubmitting}
+                >
+                  <Text style={[styles.actionText, styles.primaryButtonText]}>Proximo</Text>
+                </Pressable>
+              ) : (
+                <Pressable
+                  onPress={finalizeRegistration}
+                  style={[styles.actionButton, styles.primaryButton]}
+                  disabled={isSubmitting || feedbackState === "success"}
                 >
                   <Text style={[styles.actionText, styles.primaryButtonText]}>
-                    {isSubmitting ? "Finalizando..." : "Finalizar cadastro"}
+                    {isSubmitting ? "Finalizando..." : "Finalizar"}
                   </Text>
                 </Pressable>
-              </View>
-            )}
+              )}
+            </View>
 
-            {onNavigateToLogin && registerStage === "steps" ? (
+            {onNavigateToLogin ? (
               <Pressable
                 onPress={onNavigateToLogin}
                 style={styles.switchAuthAction}
                 disabled={isSubmitting || feedbackState === "success"}
               >
-                <Text style={styles.switchAuthText}>Já possui conta? Entrar</Text>
+                <Text style={styles.switchAuthText}>Ja possui conta? Entrar</Text>
               </Pressable>
             ) : null}
-
-            <Modal
-              visible={isCaregiverModalVisible}
-              transparent
-              animationType="fade"
-              onRequestClose={() => setIsCaregiverModalVisible(false)}
-            >
-              <View style={styles.modalOverlay}>
-                <View style={styles.modalCard}>
-                  <Text style={styles.modalTitle}>Deseja adicionar um cuidador?</Text>
-                  <View style={styles.modalActions}>
-                    <Pressable
-                      onPress={showCaregiverForm}
-                      style={[styles.modalButton, styles.primaryButton]}
-                      disabled={isSubmitting}
-                    >
-                      <Text style={[styles.actionText, styles.primaryButtonText]}>Sim</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={submitWithoutCaregiver}
-                      style={[styles.modalButton, styles.secondaryButton]}
-                      disabled={isSubmitting}
-                    >
-                      <Text style={[styles.actionText, styles.secondaryButtonText]}>Não</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              </View>
-            </Modal>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -562,30 +431,6 @@ const styles = StyleSheet.create({
   formGroup: {
     gap: 14,
   },
-  caregiverHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  chevronAction: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    borderWidth: 1,
-    borderColor: "#B7C6D7",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#F9FBFE",
-  },
-  chevronSpacer: {
-    width: 34,
-    height: 34,
-  },
-  caregiverDescription: {
-    color: "#48627A",
-    fontSize: 13,
-    lineHeight: 18,
-  },
   feedbackBox: {
     borderRadius: 12,
     borderWidth: 1,
@@ -613,9 +458,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     flexDirection: "row",
     gap: 10,
-  },
-  singleActionRow: {
-    marginTop: 4,
   },
   ghostButton: {
     flex: 1,
@@ -656,39 +498,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(17, 34, 51, 0.4)",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 20,
-  },
-  modalCard: {
-    width: "100%",
-    maxWidth: 420,
-    borderRadius: 16,
-    backgroundColor: "#FDFEFF",
-    borderWidth: 1,
-    borderColor: "#D5DEE8",
-    padding: 18,
-    gap: 16,
-  },
-  modalTitle: {
-    color: "#12314C",
-    fontSize: 18,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  modalActions: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  modalButton: {
-    flex: 1,
-    minHeight: 46,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
 });
-
