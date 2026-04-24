@@ -1,27 +1,21 @@
 import React, { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
   type LayoutChangeEvent,
 } from "react-native";
-import Animated, { FadeInDown, LinearTransition } from "react-native-reanimated";
-import {
-  Bell,
-  CalendarDays,
-  Eye,
-  LogOut,
-  Medal,
-  Settings,
-  UserRound,
-  Users,
-} from "lucide-react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
+import { Bell, Eye, LogOut, Medal, Settings, UserRound, Users } from "lucide-react-native";
+import SettingItem from "../features/navigation/components/settings-item";
 import { useRegistrationStore } from "../features/register/store/use-registration-store";
 import { useAuth } from "../hooks/useAuth";
-import SettingItem from "../features/navigation/components/settings-item";
+import { usePatientProfile } from "../hooks/use-patient-profile";
+
+const XP_PER_LEVEL = 1000;
 
 const asNonEmptyString = (value: unknown): string | null => {
   if (typeof value !== "string") {
@@ -43,47 +37,28 @@ const firstNonEmptyString = (...values: unknown[]): string | null => {
   return null;
 };
 
-const asPositiveNumber = (value: unknown, fallbackValue: number): number => {
-  if (typeof value !== "number" || Number.isNaN(value)) {
-    return fallbackValue;
+const parseDate = (value: string): Date | null => {
+  const parsedDate = new Date(value);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return null;
   }
 
-  return value >= 0 ? value : fallbackValue;
+  return parsedDate;
 };
 
-const parseDate = (value: unknown): Date | null => {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    const dateFromEpochSeconds = new Date(value * 1000);
-    if (!Number.isNaN(dateFromEpochSeconds.getTime())) {
-      return dateFromEpochSeconds;
-    }
-  }
+const formatDate = (value: string): string => {
+  const parsedDate = parseDate(value);
 
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (!trimmed) {
-      return null;
-    }
-
-    const parsedDate = new Date(trimmed);
-    if (!Number.isNaN(parsedDate.getTime())) {
-      return parsedDate;
-    }
-  }
-
-  return null;
-};
-
-const formatDate = (date: Date | null): string => {
-  if (!date) {
-    return "Não informado";
+  if (!parsedDate) {
+    return "Nao informado";
   }
 
   return new Intl.DateTimeFormat("pt-BR", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
-  }).format(date);
+  }).format(parsedDate);
 };
 
 type ProfileInfoRowProps = {
@@ -101,42 +76,14 @@ function ProfileInfoRow({ label, value }: ProfileInfoRowProps) {
 }
 
 export default function ProfileScreen() {
-  const { nome, payload, clearToken } = useAuth();
+  const { payload, clearToken } = useAuth();
   const draft = useRegistrationStore((state) => state.draft);
+  const { patientProfile, isLoading, errorMessage, refreshPatientProfile } = usePatientProfile();
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [accessibilityEnabled, setAccessibilityEnabled] = useState(false);
   const [progressTrackWidth, setProgressTrackWidth] = useState(0);
-
   const payloadRecord = (payload as Record<string, unknown> | null) ?? null;
-
-  const patientName =
-    firstNonEmptyString(
-      nome,
-      payloadRecord?.fullName,
-      payloadRecord?.patientName,
-      payloadRecord?.pacienteNomeCompleto,
-      draft.pacienteNomeCompleto
-    ) ?? "Usuário";
-
-  const transplantType =
-    firstNonEmptyString(
-      payloadRecord?.transplantType,
-      payloadRecord?.patientTransplantType,
-      payloadRecord?.pacienteTipoTransplante,
-      draft.pacienteTipoTransplante
-    ) ?? "Não informado";
-
-  const registrationDate = formatDate(
-    parseDate(
-      firstNonEmptyString(
-        payloadRecord?.createdAt,
-        payloadRecord?.created_at,
-        payloadRecord?.registrationDate,
-        payloadRecord?.registeredAt
-      ) ?? payloadRecord?.iat
-    )
-  );
 
   const caregiverName = firstNonEmptyString(
     payloadRecord?.caregiverName,
@@ -153,29 +100,9 @@ export default function ProfileScreen() {
   );
 
   const shouldShowCaregiverCard = Boolean(caregiverName || caregiverRelationship);
-
-  const userLevel = Math.max(
-    1,
-    Math.round(asPositiveNumber(payloadRecord?.level ?? payloadRecord?.nivel, 3))
-  );
-
-  const currentXp = asPositiveNumber(
-    payloadRecord?.xp ?? payloadRecord?.experiencePoints,
-    68
-  );
-
-  const xpToNextLevel = Math.max(
-    1,
-    asPositiveNumber(
-      payloadRecord?.xpToNextLevel ?? payloadRecord?.nextLevelXp,
-      100
-    )
-  );
-
-  const normalizedCurrentXp = Math.min(currentXp, xpToNextLevel);
-  const xpRemaining = Math.max(xpToNextLevel - normalizedCurrentXp, 0);
-  const progressRatio = normalizedCurrentXp / xpToNextLevel;
-  const progressWidth = progressTrackWidth * progressRatio;
+  const currentXp = patientProfile?.xpAtual ?? 0;
+  const xpProgressRatio = Math.max(0, Math.min((currentXp % XP_PER_LEVEL) / XP_PER_LEVEL, 1));
+  const xpProgressWidth = progressTrackWidth * xpProgressRatio;
 
   const handleProgressTrackLayout = (event: LayoutChangeEvent) => {
     setProgressTrackWidth(event.nativeEvent.layout.width);
@@ -191,81 +118,104 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-      <Animated.View entering={FadeInDown.duration(220)} style={styles.card}>
-        <View style={styles.mainIconBadge}>
-          <UserRound size={34} color="#2C7BE5" />
-        </View>
-
-        <Text style={styles.mainName}>{patientName}</Text>
-
-        <View style={styles.metaGroup}>
-          <ProfileInfoRow label="Tipo do transplante" value={transplantType} />
-          <ProfileInfoRow label="Cadastro em" value={registrationDate} />
-        </View>
-      </Animated.View>
-
-      <Animated.View entering={FadeInDown.delay(80).duration(230)} style={styles.card}>
-        <View style={styles.cardHeader}>
-          <View style={styles.headerLeft}>
-            <Medal size={18} color="#2C7BE5" />
-            <Text style={styles.cardTitle}>Conquistas e progresso</Text>
-          </View>
-          <Text style={styles.levelBadge}>Nível {userLevel}</Text>
-        </View>
-
-        <View style={styles.progressTrack} onLayout={handleProgressTrackLayout}>
-          <Animated.View
-            layout={LinearTransition.duration(260)}
-            style={[styles.progressFill, { width: progressWidth }]}
-          />
-        </View>
-
-        <Text style={styles.supportingText}>
-          Faltam {xpRemaining} XP para chegar ao nivel {userLevel + 1}.
-        </Text>
-      </Animated.View>
-
-      {shouldShowCaregiverCard ? (
-        <Animated.View entering={FadeInDown.delay(130).duration(240)} style={styles.card}>
-          <View style={styles.cardHeader}>
-            <View style={styles.headerLeft}>
-              <Users size={18} color="#2C7BE5" />
-              <Text style={styles.cardTitle}>Contatos de apoio</Text>
-            </View>
-          </View>
-
-          <View style={styles.metaGroup}>
-            <ProfileInfoRow
-              label="Nome do cuidador"
-              value={caregiverName ?? "Não informado"}
-            />
-            <ProfileInfoRow
-              label="Relação"
-              value={caregiverRelationship ?? "Não informado"}
-            />
+      {isLoading && !patientProfile ? (
+        <Animated.View entering={FadeInDown.duration(220)} style={styles.card}>
+          <View style={styles.loadingBlock}>
+            <ActivityIndicator size="small" color="#2C7BE5" />
+            <Text style={styles.supportingText}>Carregando dados do paciente...</Text>
           </View>
         </Animated.View>
+      ) : null}
+
+      {errorMessage && !patientProfile ? (
+        <Animated.View entering={FadeInDown.duration(220)} style={styles.card}>
+          <Text style={styles.errorText}>{errorMessage}</Text>
+          <Pressable onPress={() => void refreshPatientProfile()} style={styles.retryButton}>
+            <Text style={styles.retryButtonText}>Tentar novamente</Text>
+          </Pressable>
+        </Animated.View>
+      ) : null}
+
+      {patientProfile ? (
+        <>
+          <Animated.View entering={FadeInDown.duration(220)} style={styles.card}>
+            <View style={styles.mainIconBadge}>
+              <UserRound size={34} color="#2C7BE5" />
+            </View>
+
+            <Text style={styles.mainName}>{patientProfile.nomeCompleto}</Text>
+
+            <View style={styles.metaGroup}>
+              <ProfileInfoRow
+                label="Tipo do transplante"
+                value={patientProfile.tipoTransplante}
+              />
+              <ProfileInfoRow
+                label="Data do transplante"
+                value={formatDate(patientProfile.dataTransplante)}
+              />
+            </View>
+          </Animated.View>
+
+          <Animated.View entering={FadeInDown.delay(80).duration(230)} style={styles.card}>
+            <View style={styles.cardHeader}>
+              <View style={styles.headerLeft}>
+                <Medal size={18} color="#2C7BE5" />
+                <Text style={styles.cardTitle}>Conquistas e progresso</Text>
+              </View>
+              <Text style={styles.levelBadge}>Nivel {Math.max(1, Math.round(patientProfile.nivel))}</Text>
+            </View>
+
+            <View style={styles.progressTrack} onLayout={handleProgressTrackLayout}>
+              <View style={[styles.progressFill, { width: xpProgressWidth }]} />
+            </View>
+            <Text style={styles.supportingText}>Voce tem {patientProfile.xpAtual} XP.</Text>
+            {/* Moedas devem ser exibidas neste card quando o layout de moedas for adicionado. */}
+          </Animated.View>
+
+          {shouldShowCaregiverCard ? (
+            <Animated.View entering={FadeInDown.delay(130).duration(240)} style={styles.card}>
+              <View style={styles.cardHeader}>
+                <View style={styles.headerLeft}>
+                  <Users size={18} color="#2C7BE5" />
+                  <Text style={styles.cardTitle}>Contatos de apoio</Text>
+                </View>
+              </View>
+
+              <View style={styles.metaGroup}>
+                <ProfileInfoRow
+                  label="Nome do cuidador"
+                  value={caregiverName ?? "Nao informado"}
+                />
+                <ProfileInfoRow
+                  label="Relacao"
+                  value={caregiverRelationship ?? "Nao informado"}
+                />
+              </View>
+            </Animated.View>
+          ) : null}
+        </>
       ) : null}
 
       <Animated.View entering={FadeInDown.delay(180).duration(250)} style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={styles.headerLeft}>
             <Settings size={18} color="#2C7BE5" />
-            <Text style={styles.cardTitle}>Configurações</Text>
+            <Text style={styles.cardTitle}>Configuracoes</Text>
           </View>
         </View>
 
         <View style={styles.settingsGroup}>
           <SettingItem
-            label="Preferências de notificação"
-            description="Receba lembretes sobre medicamentos e missões."
+            label="Preferencias de notificacao"
+            description="Receba lembretes sobre medicamentos e missoes."
             value={notificationsEnabled}
             onValueChange={setNotificationsEnabled}
             Icon={Bell}
           />
 
           <SettingItem
-            label="Configurações de acessibilidade"
+            label="Configuracoes de acessibilidade"
             description={accessibilityDescription}
             value={accessibilityEnabled}
             onValueChange={setAccessibilityEnabled}
@@ -303,6 +253,30 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 3,
     gap: 12,
+  },
+  loadingBlock: {
+    minHeight: 56,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  errorText: {
+    color: "#9B2F2F",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  retryButton: {
+    minHeight: 40,
+    borderRadius: 10,
+    backgroundColor: "#2C7BE5",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  retryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
   },
   mainIconBadge: {
     width: 72,
@@ -383,45 +357,6 @@ const styles = StyleSheet.create({
   },
   settingsGroup: {
     gap: 8,
-  },
-  settingRow: {
-    borderRadius: 12,
-    minHeight: 64,
-    backgroundColor: "#F4F8FC",
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  settingLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-    flex: 1,
-  },
-  settingIconBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#E3EFFD",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  settingTextBlock: {
-    flex: 1,
-    gap: 2,
-  },
-  settingLabel: {
-    color: "#12314C",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  settingDescription: {
-    color: "#5C738B",
-    fontSize: 12,
-    lineHeight: 16,
   },
   logoutButton: {
     minHeight: 44,
