@@ -6,3 +6,9 @@ export type PatientProfileResponse = {
   tipoTransplante: string;
   xpAtual: number;
 };
+
+export type CaregiverProfileResponse = {
+  nomeCompleto: string;
+  relacao: string;
+  telefone: string;
+};

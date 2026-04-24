@@ -3,6 +3,10 @@ import type { PatientProfileResponse } from "../features/profile/types";
 import { useAuthStore } from "../store/auth-store";
 import { fetchPatientProfileById } from "../services/patient-service";
 
+type UsePatientProfileOptions = {
+  enabled?: boolean;
+};
+
 type UsePatientProfileResult = {
   patientProfile: PatientProfileResponse | null;
   isLoading: boolean;
@@ -10,7 +14,10 @@ type UsePatientProfileResult = {
   refreshPatientProfile: () => Promise<void>;
 };
 
-export function usePatientProfile(): UsePatientProfileResult {
+export function usePatientProfile(
+  options: UsePatientProfileOptions = {}
+): UsePatientProfileResult {
+  const { enabled = true } = options;
   const patientId = useAuthStore((state) => state.id);
 
   const [patientProfile, setPatientProfile] = useState<PatientProfileResponse | null>(null);
@@ -18,6 +25,13 @@ export function usePatientProfile(): UsePatientProfileResult {
   const [errorMessage, setErrorMessage] = useState("");
 
   const refreshPatientProfile = useCallback(async () => {
+    if (!enabled) {
+      setPatientProfile(null);
+      setErrorMessage("");
+      setIsLoading(false);
+      return;
+    }
+
     if (!patientId) {
       setPatientProfile(null);
       setErrorMessage("Sessao sem ID de paciente.");
@@ -40,7 +54,7 @@ export function usePatientProfile(): UsePatientProfileResult {
     } finally {
       setIsLoading(false);
     }
-  }, [patientId]);
+  }, [enabled, patientId]);
 
   useEffect(() => {
     void refreshPatientProfile();

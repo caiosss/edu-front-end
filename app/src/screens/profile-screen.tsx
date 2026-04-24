@@ -9,33 +9,13 @@ import {
   type LayoutChangeEvent,
 } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { Bell, Eye, LogOut, Medal, Settings, UserRound, Users } from "lucide-react-native";
+import { Bell, Eye, LogOut, Medal, Settings, UserRound } from "lucide-react-native";
 import SettingItem from "../features/navigation/components/settings-item";
-import { useRegistrationStore } from "../features/register/store/use-registration-store";
 import { useAuth } from "../hooks/useAuth";
+import { useCaregiverProfile } from "../hooks/use-caregiver-profile";
 import { usePatientProfile } from "../hooks/use-patient-profile";
 
 const XP_PER_LEVEL = 1000;
-
-const asNonEmptyString = (value: unknown): string | null => {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const trimmedValue = value.trim();
-  return trimmedValue.length > 0 ? trimmedValue : null;
-};
-
-const firstNonEmptyString = (...values: unknown[]): string | null => {
-  for (const value of values) {
-    const parsedValue = asNonEmptyString(value);
-    if (parsedValue) {
-      return parsedValue;
-    }
-  }
-
-  return null;
-};
 
 const parseDate = (value: string): Date | null => {
   const parsedDate = new Date(value);
@@ -80,30 +60,37 @@ function ProfileInfoRow({ label, value }: ProfileInfoRowProps) {
 }
 
 export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScreenProps) {
-  const { payload, clearToken } = useAuth();
-  const draft = useRegistrationStore((state) => state.draft);
-  const { patientProfile, isLoading, errorMessage, refreshPatientProfile } = usePatientProfile();
+  const { tipoUsuario, clearToken } = useAuth();
+  const isCaregiverUser = tipoUsuario === "CUIDADOR";
+
+  const {
+    patientProfile,
+    isLoading: isPatientLoading,
+    errorMessage: patientErrorMessage,
+    refreshPatientProfile,
+  } = usePatientProfile({ enabled: !isCaregiverUser });
+
+  const {
+    caregiverProfile,
+    isLoading: isCaregiverLoading,
+    errorMessage: caregiverErrorMessage,
+    refreshCaregiverProfile,
+  } = useCaregiverProfile({ enabled: isCaregiverUser });
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [accessibilityEnabled, setAccessibilityEnabled] = useState(false);
   const [progressTrackWidth, setProgressTrackWidth] = useState(0);
-  const payloadRecord = (payload as Record<string, unknown> | null) ?? null;
 
-  const caregiverName = firstNonEmptyString(
-    payloadRecord?.caregiverName,
-    payloadRecord?.caregiverFullName,
-    payloadRecord?.cuidadorNomeCompleto,
-    draft.cuidadorNomeCompleto
-  );
+  const isProfileLoading = isCaregiverUser ? isCaregiverLoading : isPatientLoading;
+  const profileErrorMessage = isCaregiverUser ? caregiverErrorMessage : patientErrorMessage;
+  const hasProfileData = isCaregiverUser
+    ? Boolean(caregiverProfile)
+    : Boolean(patientProfile);
 
-  const caregiverRelationship = firstNonEmptyString(
-    payloadRecord?.caregiverRelationship,
-    payloadRecord?.caregiverRelation,
-    payloadRecord?.cuidadorRelacao,
-    draft.cuidadorRelacao
-  );
+  const refreshProfile = isCaregiverUser
+    ? refreshCaregiverProfile
+    : refreshPatientProfile;
 
-  const shouldShowCaregiverCard = Boolean(caregiverName || caregiverRelationship);
   const currentXp = patientProfile?.xpAtual ?? 0;
   const xpProgressRatio = Math.max(0, Math.min((currentXp % XP_PER_LEVEL) / XP_PER_LEVEL, 1));
   const xpProgressWidth = progressTrackWidth * xpProgressRatio;
@@ -122,25 +109,44 @@ export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScree
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-      {isLoading && !patientProfile ? (
+      {isProfileLoading && !hasProfileData ? (
         <Animated.View entering={FadeInDown.duration(220)} style={styles.card}>
           <View style={styles.loadingBlock}>
             <ActivityIndicator size="small" color="#2C7BE5" />
-            <Text style={styles.supportingText}>Carregando dados do paciente...</Text>
+            <Text style={styles.supportingText}>
+              {isCaregiverUser
+                ? "Carregando dados do cuidador..."
+                : "Carregando dados do paciente..."}
+            </Text>
           </View>
         </Animated.View>
       ) : null}
 
-      {errorMessage && !patientProfile ? (
+      {profileErrorMessage && !hasProfileData ? (
         <Animated.View entering={FadeInDown.duration(220)} style={styles.card}>
-          <Text style={styles.errorText}>{errorMessage}</Text>
-          <Pressable onPress={() => void refreshPatientProfile()} style={styles.retryButton}>
+          <Text style={styles.errorText}>{profileErrorMessage}</Text>
+          <Pressable onPress={() => void refreshProfile()} style={styles.retryButton}>
             <Text style={styles.retryButtonText}>Tentar novamente</Text>
           </Pressable>
         </Animated.View>
       ) : null}
 
-      {patientProfile ? (
+      {isCaregiverUser && caregiverProfile ? (
+        <Animated.View entering={FadeInDown.duration(220)} style={styles.card}>
+          <View style={styles.mainIconBadge}>
+            <UserRound size={34} color="#2C7BE5" />
+          </View>
+
+          <Text style={styles.mainName}>{caregiverProfile.nomeCompleto}</Text>
+
+          <View style={styles.metaGroup}>
+            <ProfileInfoRow label="Relacao" value={caregiverProfile.relacao} />
+            <ProfileInfoRow label="Telefone" value={caregiverProfile.telefone} />
+          </View>
+        </Animated.View>
+      ) : null}
+
+      {!isCaregiverUser && patientProfile ? (
         <>
           <Animated.View entering={FadeInDown.duration(220)} style={styles.card}>
             <View style={styles.mainIconBadge}>
@@ -167,7 +173,9 @@ export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScree
                 <Medal size={18} color="#2C7BE5" />
                 <Text style={styles.cardTitle}>Conquistas e progresso</Text>
               </View>
-              <Text style={styles.levelBadge}>Nivel {Math.max(1, Math.round(patientProfile.nivel))}</Text>
+              <Text style={styles.levelBadge}>
+                Nivel {Math.max(1, Math.round(patientProfile.nivel))}
+              </Text>
             </View>
 
             <View style={styles.progressTrack} onLayout={handleProgressTrackLayout}>
@@ -176,32 +184,10 @@ export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScree
             <Text style={styles.supportingText}>Voce tem {patientProfile.xpAtual} XP.</Text>
             {/* Moedas devem ser exibidas neste card quando o layout de moedas for adicionado. */}
           </Animated.View>
-
-          {shouldShowCaregiverCard ? (
-            <Animated.View entering={FadeInDown.delay(130).duration(240)} style={styles.card}>
-              <View style={styles.cardHeader}>
-                <View style={styles.headerLeft}>
-                  <Users size={18} color="#2C7BE5" />
-                  <Text style={styles.cardTitle}>Contatos de apoio</Text>
-                </View>
-              </View>
-
-              <View style={styles.metaGroup}>
-                <ProfileInfoRow
-                  label="Nome do cuidador"
-                  value={caregiverName ?? "Nao informado"}
-                />
-                <ProfileInfoRow
-                  label="Relacao"
-                  value={caregiverRelationship ?? "Nao informado"}
-                />
-              </View>
-            </Animated.View>
-          ) : null}
         </>
       ) : null}
 
-      {onNavigateToAddCaregiver ? (
+      {!isCaregiverUser && onNavigateToAddCaregiver ? (
         <Pressable
           onPress={onNavigateToAddCaregiver}
           style={styles.addCaregiverButton}
