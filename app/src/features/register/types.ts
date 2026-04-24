@@ -6,6 +6,7 @@ export type RegistrationFormValues = {
   email: string;
   senha: string;
   tipoUsuario: string;
+  pacienteCpf: string;
   pacienteNomeCompleto: string;
   pacienteDataNascimento: string;
   pacienteTipoTransplante: string;
@@ -19,6 +20,7 @@ export const registrationDefaultValues: RegistrationFormValues = {
   email: "",
   senha: "",
   tipoUsuario: "",
+  pacienteCpf: "",
   pacienteNomeCompleto: "",
   pacienteDataNascimento: "",
   pacienteTipoTransplante: "",
@@ -45,6 +47,7 @@ export type RegisterPayload = {
   email: string;
   senha: string;
   tipoUsuario: UserType;
+  cpf?: string;
   nomeCompleto: string;
   dataNascimento: string;
   tipoTransplante: string;

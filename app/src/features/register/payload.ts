@@ -2,6 +2,7 @@ import type { RegisterPayload, RegistrationFormValues, UserType } from "./types"
 import { normalizeDateToISO } from "./utils/date";
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
+const normalizeCpf = (cpf: string) => cpf.replace(/\D/g, "");
 
 export const buildRegisterPayload = (
   values: RegistrationFormValues,
@@ -25,6 +26,10 @@ export const buildRegisterPayload = (
     telefone: userType === "CUIDADOR" ? values.cuidadorTelefone : "",
     relacao: userType === "CUIDADOR" ? values.cuidadorRelacao : "",
   };
+
+  if (userType === "PACIENTE") {
+    payload.cpf = normalizeCpf(values.pacienteCpf);
+  }
 
   return payload;
 };

@@ -1,6 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -27,6 +28,7 @@ import { buildRegisterPayload } from "../features/register/payload";
 import { useRegistrationStore } from "../features/register/store/use-registration-store";
 import type { RegistrationFormValues, UserType } from "../features/register/types";
 import { registrationSchema } from "../features/register/validation";
+import { fetchPatientNameByCpf } from "../services/auth-service";
 import { registerUser } from "../services/registration-service";
 
 type TransitionDirection = "forward" | "backward";
@@ -38,6 +40,7 @@ type RegisterScreenProps = {
 
 const credentialStepFields: Array<keyof RegistrationFormValues> = ["email", "senha"];
 const patientStepFields: Array<keyof RegistrationFormValues> = [
+  "pacienteCpf",
   "pacienteNomeCompleto",
   "pacienteDataNascimento",
   "pacienteTipoTransplante",
@@ -47,6 +50,11 @@ const caregiverOnlyFields: Array<keyof RegistrationFormValues> = [
   "cuidadorNomeCompleto",
   "cuidadorTelefone",
   "cuidadorRelacao",
+];
+const caregiverSubmitFields: Array<keyof RegistrationFormValues> = [
+  "pacienteCpf",
+  "pacienteNomeCompleto",
+  ...caregiverOnlyFields,
 ];
 const maskBrDateInput = (input: string): string => {
   const digits = input.replace(/\D/g, "").slice(0, 8);
@@ -62,6 +70,26 @@ const maskBrDateInput = (input: string): string => {
   return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4, 8)}`;
 };
 
+const maskCpfInput = (input: string): string => {
+  const digits = input.replace(/\D/g, "").slice(0, 11);
+
+  if (digits.length <= 3) {
+    return digits;
+  }
+
+  if (digits.length <= 6) {
+    return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+  }
+
+  if (digits.length <= 9) {
+    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+  }
+
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9, 11)}`;
+};
+
+const normalizeCpfInput = (input: string): string => input.replace(/\D/g, "");
+
 export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProps) {
   const { width } = useWindowDimensions();
   const draft = useRegistrationStore((state) => state.draft);
@@ -75,6 +103,9 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [registerStage, setRegisterStage] = useState<RegisterStage>("steps");
   const [isCaregiverModalVisible, setIsCaregiverModalVisible] = useState(false);
+  const [isCpfLookupLoading, setIsCpfLookupLoading] = useState(false);
+  const [cpfLookupState, setCpfLookupState] = useState<FeedbackState>("idle");
+  const [cpfLookupMessage, setCpfLookupMessage] = useState("");
 
   const {
     control,
@@ -90,6 +121,9 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
     mode: "onChange",
     reValidateMode: "onChange",
   });
+  const watchedPatientCpf = watch("pacienteCpf");
+  const watchedPatientName = watch("pacienteNomeCompleto");
+  const isPatientNameFilled = watchedPatientName.trim().length > 0;
 
   const stepLabels = useMemo(() => ["Credenciais", "Dados do paciente"], []);
   const containerWidth = useMemo(() => Math.min(width - 24, 540), [width]);
@@ -108,6 +142,44 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
       shouldValidate: false,
     });
   }, [setValue]);
+
+  useEffect(() => {
+    setCpfLookupState("idle");
+    setCpfLookupMessage("");
+  }, [watchedPatientCpf]);
+
+  const lookupPatientByCpf = async () => {
+    const normalizedCpf = normalizeCpfInput(watchedPatientCpf);
+
+    if (normalizedCpf.length !== 11) {
+      setCpfLookupState("error");
+      setCpfLookupMessage("Informe um CPF valido com 11 digitos.");
+      return;
+    }
+
+    setCpfLookupState("idle");
+    setCpfLookupMessage("");
+    setIsCpfLookupLoading(true);
+
+    try {
+      const patientName = await fetchPatientNameByCpf(normalizedCpf);
+      setValue("pacienteNomeCompleto", patientName, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+      setCpfLookupState("success");
+      setCpfLookupMessage("Nome do paciente preenchido automaticamente.");
+    } catch (error) {
+      setCpfLookupState("error");
+      setCpfLookupMessage(
+        error instanceof Error
+          ? error.message
+          : "Nao foi possivel consultar o paciente pelo CPF."
+      );
+    } finally {
+      setIsCpfLookupLoading(false);
+    }
+  };
 
   const nextStep = async () => {
     const isStepOneValid = await trigger(credentialStepFields, {
@@ -191,7 +263,7 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
   };
 
   const finalizeCaregiverRegistration = async () => {
-    const isCaregiverValid = await trigger(caregiverOnlyFields, {
+    const isCaregiverValid = await trigger(caregiverSubmitFields, {
       shouldFocus: true,
     });
 
@@ -204,6 +276,15 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
 
   const renderPatientFields = () => (
     <View style={styles.formGroup}>
+      <FormInput
+        control={control}
+        name="pacienteCpf"
+        label="CPF"
+        placeholder="000.000.000-00"
+        keyboardType="number-pad"
+        maxLength={14}
+        valueFormatter={maskCpfInput}
+      />
       <FormInput
         control={control}
         name="pacienteNomeCompleto"
@@ -241,6 +322,70 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
 
   const renderCaregiverFields = () => (
     <View style={styles.formGroup}>
+      <FormInput
+        control={control}
+        name="pacienteCpf"
+        label="CPF do paciente"
+        placeholder="000.000.000-00"
+        keyboardType="number-pad"
+        maxLength={14}
+        valueFormatter={maskCpfInput}
+      />
+      {!isPatientNameFilled && (
+
+        <Pressable
+          onPress={lookupPatientByCpf}
+          style={[
+            styles.lookupButton,
+            isCpfLookupLoading ? styles.lookupButtonLoading : undefined,
+            
+          ]}
+          disabled={isCpfLookupLoading || isSubmitting || isPatientNameFilled}
+        >
+          {isCpfLookupLoading ? (
+            <View style={styles.lookupButtonContent}>
+              <ActivityIndicator size="small" color="#FFFFFF" />
+              <Text style={[styles.actionText, styles.primaryButtonText]}>
+                Buscando paciente...
+              </Text>
+            </View>
+          ) : (
+            <Text style={[styles.actionText, styles.primaryButtonText]}>
+              Buscar paciente por CPF
+            </Text>
+          )}
+        </Pressable>
+      )}
+
+      {cpfLookupState !== "idle" ? (
+        <View
+          style={[
+            styles.feedbackBox,
+            cpfLookupState === "success"
+              ? styles.feedbackSuccess
+              : styles.feedbackError,
+          ]}
+        >
+          <Text
+            style={[
+              styles.feedbackText,
+              cpfLookupState === "success"
+                ? styles.feedbackTextSuccess
+                : styles.feedbackTextError,
+            ]}
+          >
+            {cpfLookupMessage}
+          </Text>
+        </View>
+      ) : null}
+
+      <FormInput
+        control={control}
+        name="pacienteNomeCompleto"
+        label="Nome do paciente"
+        placeholder="Nome preenchido automaticamente"
+        autoCapitalize="words"
+      />
       <FormInput
         control={control}
         name="cuidadorNomeCompleto"
@@ -435,7 +580,9 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
                 <Pressable
                   onPress={finalizeCaregiverRegistration}
                   style={[styles.actionButton, styles.primaryButton]}
-                  disabled={isSubmitting || feedbackState === "success"}
+                  disabled={
+                    isSubmitting || isCpfLookupLoading || feedbackState === "success"
+                  }
                 >
                   <Text style={[styles.actionText, styles.primaryButtonText]}>
                     {isSubmitting ? "Finalizando..." : "Finalizar cadastro"}
@@ -541,6 +688,25 @@ const styles = StyleSheet.create({
   },
   formGroup: {
     gap: 14,
+  },
+  lookupButton: {
+    minHeight: 46,
+    borderRadius: 12,
+    backgroundColor: "#2C7BE5",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 14,
+  },
+  lookupButtonLoading: {
+    opacity: 0.9,
+  },
+  lookupButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  lookUpButtonDisabled: {
+    backgroundColor: "#838684",
   },
   caregiverHeader: {
     flexDirection: "row",

@@ -9,6 +9,32 @@ const asNonEmptyString = (value: unknown): string | null => {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
 };
 
+const normalizeCpf = (cpf: string): string => cpf.replace(/\D/g, "");
+
+const extractPatientName = (data: unknown): string | null => {
+  if (typeof data === "string") {
+    return asNonEmptyString(data);
+  }
+
+  if (!data || typeof data !== "object") {
+    return null;
+  }
+
+  const parsedData = data as {
+    nome?: unknown;
+    nomeCompleto?: unknown;
+    fullName?: unknown;
+    patientName?: unknown;
+  };
+
+  return (
+    asNonEmptyString(parsedData.nome) ??
+    asNonEmptyString(parsedData.nomeCompleto) ??
+    asNonEmptyString(parsedData.fullName) ??
+    asNonEmptyString(parsedData.patientName)
+  );
+};
+
 const normalizeLoginResponse = (data: unknown): LoginResult => {
   if (!data || typeof data !== "object") {
     throw new Error("Resposta de autenticacao invalida.");
@@ -83,6 +109,45 @@ export const loginUser = async (payload: LoginPayload): Promise<LoginResult> => 
       (error.response?.status === 401 || error.response?.status === 403)
     ) {
       throw new InvalidCredentialsError();
+    }
+
+    throw error;
+  }
+};
+
+export const fetchPatientNameByCpf = async (cpf: string): Promise<string> => {
+  const normalizedCpf = normalizeCpf(cpf);
+
+  if (normalizedCpf.length !== 11) {
+    throw new Error("Informe um CPF valido com 11 digitos.");
+  }
+
+  try {
+    const response = await api.get(`/auth/${normalizedCpf}`);
+    const patientName = extractPatientName(response.data);
+
+    if (!patientName) {
+      throw new Error("Resposta invalida da API ao consultar CPF.");
+    }
+
+    return patientName;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+
+      if (status === 404) {
+        throw new Error("Paciente nao encontrado para o CPF informado.");
+      }
+
+      if (status === 400) {
+        throw new Error("CPF invalido para consulta.");
+      }
+
+      if (!status) {
+        throw new Error("Nao foi possivel conectar com a API para consultar o CPF.");
+      }
+
+      throw new Error(`Falha ao consultar CPF (HTTP ${status}).`);
     }
 
     throw error;

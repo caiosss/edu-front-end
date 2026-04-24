@@ -63,6 +63,7 @@ export const registrationSchema = z
       .regex(/[a-z]/, "A senha precisa de ao menos 1 letra minuscula.")
       .regex(/[0-9]/, "A senha precisa de ao menos 1 numero."),
     tipoUsuario: z.string(),
+    pacienteCpf: z.string(),
     pacienteNomeCompleto: z.string(),
     pacienteDataNascimento: z.string(),
     pacienteTipoTransplante: z.string(),
@@ -86,6 +87,19 @@ export const registrationSchema = z
     const needsPatientData = userType === "PACIENTE" || userType === "CUIDADOR";
 
     if (needsPatientData) {
+      if (!hasValue(values.pacienteCpf)) {
+        addRequiredIssue(context, "pacienteCpf");
+      } else {
+        const cpfDigits = values.pacienteCpf.replace(/\D/g, "");
+        if (cpfDigits.length !== 11) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["pacienteCpf"],
+            message: "Informe um CPF valido com 11 digitos.",
+          });
+        }
+      }
+
       if (!hasValue(values.pacienteNomeCompleto)) {
         addRequiredIssue(context, "pacienteNomeCompleto");
       }
@@ -151,6 +165,7 @@ export type RegistrationFieldName = keyof RegistrationFormValues;
 export const stepOneFields: RegistrationFieldName[] = ["email", "senha", "tipoUsuario"];
 
 export const patientStepFields: RegistrationFieldName[] = [
+  "pacienteCpf",
   "pacienteNomeCompleto",
   "pacienteDataNascimento",
   "pacienteTipoTransplante",
