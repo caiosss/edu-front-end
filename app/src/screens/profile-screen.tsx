@@ -66,6 +66,10 @@ type ProfileInfoRowProps = {
   value: string;
 };
 
+type ProfileScreenProps = {
+  onNavigateToAddCaregiver?: () => void;
+};
+
 function ProfileInfoRow({ label, value }: ProfileInfoRowProps) {
   return (
     <View style={styles.infoRow}>
@@ -75,7 +79,7 @@ function ProfileInfoRow({ label, value }: ProfileInfoRowProps) {
   );
 }
 
-export default function ProfileScreen() {
+export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScreenProps) {
   const { payload, clearToken } = useAuth();
   const draft = useRegistrationStore((state) => state.draft);
   const { patientProfile, isLoading, errorMessage, refreshPatientProfile } = usePatientProfile();
@@ -195,6 +199,16 @@ export default function ProfileScreen() {
             </Animated.View>
           ) : null}
         </>
+      ) : null}
+
+      {onNavigateToAddCaregiver ? (
+        <Pressable
+          onPress={onNavigateToAddCaregiver}
+          style={styles.addCaregiverButton}
+          android_ripple={{ color: "rgba(255, 255, 255, 0.22)", borderless: false }}
+        >
+          <Text style={styles.addCaregiverButtonText}>Adicionar cuidador</Text>
+        </Pressable>
       ) : null}
 
       <Animated.View entering={FadeInDown.delay(180).duration(250)} style={styles.card}>
@@ -357,6 +371,19 @@ const styles = StyleSheet.create({
   },
   settingsGroup: {
     gap: 8,
+  },
+  addCaregiverButton: {
+    minHeight: 44,
+    borderRadius: 12,
+    backgroundColor: "#2C7BE5",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 14,
+  },
+  addCaregiverButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
   },
   logoutButton: {
     minHeight: 44,
