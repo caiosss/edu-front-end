@@ -1,6 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,22 +9,139 @@ import {
 import Animated, { FadeInDown, LinearTransition } from "react-native-reanimated";
 import {
   Bell,
-  Circle,
-  CircleCheck,
   CircleStar,
   GlassWater,
   Pill,
   Star,
   type LucideIcon,
 } from "lucide-react-native";
+import type {
+  GeneralMissionResponse,
+  MedicationMissionResponse,
+} from "../features/home/types";
+import ChecklistCard, {
+  type ChecklistItem,
+} from "../features/navigation/components/check-list-card";
 import { useAuth } from "../hooks/useAuth";
-import ChecklistCard, { dailyMissions, medications } from "../features/navigation/components/check-list-card";
+import { useHomeMissions } from "../hooks/use-home-missions";
+
+const formatTimeLabel = (value: string): string => {
+  const normalizedTime = value.trim();
+
+  if (!normalizedTime) {
+    return "";
+  }
+
+  const parsedTime = normalizedTime.match(/^(\d{2}):(\d{2})(?::\d{2})?$/);
+
+  if (parsedTime) {
+    return `${parsedTime[1]}:${parsedTime[2]}`;
+  }
+
+  return normalizedTime;
+};
+
+const resolveMissionIcon = (categoria: string): LucideIcon => {
+  const normalizedCategory = categoria.trim().toUpperCase();
+
+  if (normalizedCategory.includes("MEDIC")) {
+    return Pill;
+  }
+
+  if (normalizedCategory.includes("HIDR") || normalizedCategory.includes("AGUA")) {
+    return GlassWater;
+  }
+
+  if (
+    normalizedCategory.includes("ATIV") ||
+    normalizedCategory.includes("CAMIN") ||
+    normalizedCategory.includes("EXERC")
+  ) {
+    return Star;
+  }
+
+  return CircleStar;
+};
+
+const mapGeneralMissionToChecklistItem = (
+  mission: GeneralMissionResponse
+): ChecklistItem => {
+  const subtitle = mission.observacao.trim() || mission.descricao.trim();
+
+  return {
+    id: mission.id,
+    title: mission.nome,
+    subtitle: subtitle.length > 0 ? subtitle : undefined,
+    icon: resolveMissionIcon(mission.categoria),
+  };
+};
+
+const mapMedicationMissionToChecklistItem = (
+  mission: MedicationMissionResponse
+): ChecklistItem => {
+  const subtitleParts: string[] = [];
+
+  if (mission.dosagem.trim()) {
+    subtitleParts.push(mission.dosagem.trim());
+  }
+
+  const firstDoseTime = formatTimeLabel(mission.horarioPrimeiraDose);
+
+  if (firstDoseTime) {
+    subtitleParts.push(firstDoseTime);
+  }
+
+  if (mission.frequenciaHoras > 0) {
+    subtitleParts.push(`a cada ${mission.frequenciaHoras}h`);
+  }
+
+  return {
+    id: mission.id,
+    title: mission.nomeMedicamento,
+    subtitle: subtitleParts.length > 0 ? subtitleParts.join(" - ") : undefined,
+    icon: Pill,
+  };
+};
 
 export default function HomeScreen() {
   const { nome } = useAuth();
+  const { missions, isLoading, errorMessage } = useHomeMissions();
+
   const [takenMedicationIds, setTakenMedicationIds] = useState<string[]>([]);
   const [completedMissionIds, setCompletedMissionIds] = useState<string[]>([]);
   const [progressTrackWidth, setProgressTrackWidth] = useState(0);
+
+  const medicationItems = useMemo(() => {
+    if (!missions) {
+      return [];
+    }
+
+    return missions.missoesMedicamento
+      .filter((mission) => mission.ativo)
+      .map(mapMedicationMissionToChecklistItem);
+  }, [missions]);
+
+  const dailyMissionItems = useMemo(() => {
+    if (!missions) {
+      return [];
+    }
+
+    return missions.missoesGerais
+      .filter((mission) => mission.ativa)
+      .map(mapGeneralMissionToChecklistItem);
+  }, [missions]);
+
+  useEffect(() => {
+    setTakenMedicationIds((currentIds) =>
+      currentIds.filter((id) => medicationItems.some((item) => item.id === id))
+    );
+  }, [medicationItems]);
+
+  useEffect(() => {
+    setCompletedMissionIds((currentIds) =>
+      currentIds.filter((id) => dailyMissionItems.some((item) => item.id === id))
+    );
+  }, [dailyMissionItems]);
 
   const toggleMedication = (itemId: string) => {
     setTakenMedicationIds((currentIds) =>
@@ -44,19 +160,48 @@ export default function HomeScreen() {
   };
 
   const weeklyCompletedDays = useMemo(() => {
-    const totalActivities = medications.length + dailyMissions.length;
+    const totalActivities = medicationItems.length + dailyMissionItems.length;
     const completedActivities = takenMedicationIds.length + completedMissionIds.length;
 
-    if (completedActivities === 0) {
+    if (completedActivities === 0 || totalActivities === 0) {
       return 0;
     }
 
     return Math.max(1, Math.round((completedActivities / totalActivities) * 7));
-  }, [completedMissionIds.length, takenMedicationIds.length]);
+  }, [
+    completedMissionIds.length,
+    dailyMissionItems.length,
+    medicationItems.length,
+    takenMedicationIds.length,
+  ]);
 
   const weeklyProgressRatio = weeklyCompletedDays / 7;
   const weeklyProgressWidth = progressTrackWidth * weeklyProgressRatio;
   const welcomeName = nome ?? "paciente";
+
+  const medicationDescription = useMemo(() => {
+    if (errorMessage) {
+      return "Nao foi possivel carregar os medicamentos de hoje.";
+    }
+
+    if (isLoading && !missions) {
+      return "Carregando seus medicamentos de hoje...";
+    }
+
+    return "Acompanhe e marque cada dose no horario certo.";
+  }, [errorMessage, isLoading, missions]);
+
+  const missionDescription = useMemo(() => {
+    if (errorMessage) {
+      return "Nao foi possivel carregar as missoes de hoje.";
+    }
+
+    if (isLoading && !missions) {
+      return "Carregando suas missoes do dia...";
+    }
+
+    return "Complete suas missoes para ganhar pontos e evoluir.";
+  }, [errorMessage, isLoading, missions]);
 
   const handleProgressTrackLayout = (event: LayoutChangeEvent) => {
     setProgressTrackWidth(event.nativeEvent.layout.width);
@@ -74,14 +219,14 @@ export default function HomeScreen() {
             <Bell size={18} color="#2C7BE5" />
           </View>
         </View>
-        <Text style={styles.subtitle}>Vamos começar seu plano de autocuidado de hoje?</Text>
+        <Text style={styles.subtitle}>Vamos comecar seu plano de autocuidado de hoje?</Text>
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(60).duration(230)}>
         <ChecklistCard
           title="Medicamentos de hoje"
-          description="Acompanhe e marque cada dose no horário certo."
-          items={medications}
+          description={medicationDescription}
+          items={medicationItems}
           checkedIds={takenMedicationIds}
           onToggleItem={toggleMedication}
         />
@@ -89,9 +234,9 @@ export default function HomeScreen() {
 
       <Animated.View entering={FadeInDown.delay(120).duration(240)}>
         <ChecklistCard
-          title="Missões do dia"
-          description="Complete suas missões para ganhar pontos e evoluir."
-          items={dailyMissions}
+          title="Missoes do dia"
+          description={missionDescription}
+          items={dailyMissionItems}
           checkedIds={completedMissionIds}
           onToggleItem={toggleMission}
         />
@@ -100,7 +245,7 @@ export default function HomeScreen() {
       <Animated.View entering={FadeInDown.delay(180).duration(250)} style={styles.card}>
         <Text style={styles.h2}>Progresso semanal</Text>
         <Text style={styles.info}>
-          Você completou {weeklyCompletedDays} de 7 dias de autocuidado esta semana.
+          Voce completou {weeklyCompletedDays} de 7 dias de autocuidado esta semana.
         </Text>
 
         <View style={styles.progressRow}>
@@ -179,69 +324,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#35506B",
     lineHeight: 20,
-  },
-  checklistGroup: {
-    gap: 8,
-  },
-  checklistRow: {
-    borderRadius: 12,
-    minHeight: 58,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: "#F4F8FC",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  checklistRowChecked: {
-    backgroundColor: "#E8F2FF",
-  },
-  checklistLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    flex: 1,
-  },
-  iconBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#DFEAF5",
-  },
-  iconBadgeChecked: {
-    backgroundColor: "#CEE4FF",
-  },
-  checklistTextBlock: {
-    flex: 1,
-    gap: 2,
-  },
-  checklistTitle: {
-    color: "#14324C",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  checklistSubtitle: {
-    color: "#5B738A",
-    fontSize: 12,
-  },
-  checklistRight: {
-    alignItems: "center",
-    justifyContent: "center",
-    minWidth: 98,
-    gap: 2,
-  },
-  checkActionLabel: {
-    fontSize: 11,
-    color: "#5B738A",
-    textAlign: "center",
-    lineHeight: 14,
-  },
-  checkActionLabelDone: {
-    color: "#1A6FD6",
-    fontWeight: "700",
   },
   progressRow: {
     marginTop: 2,

@@ -167,6 +167,7 @@ export default function AddCaregiverScreen({ onNavigateBack }: AddCaregiverScree
         ...values,
         tipoUsuario: userType,
         senha: "",
+        pacienteCpf: values.pacienteCpf.replace(/\D/g, ""),
       },
       userType
     );
@@ -183,6 +184,7 @@ export default function AddCaregiverScreen({ onNavigateBack }: AddCaregiverScree
       setValue("cuidadorNomeCompleto", "", { shouldDirty: false, shouldValidate: false });
       setValue("cuidadorTelefone", "", { shouldDirty: false, shouldValidate: false });
       setValue("cuidadorRelacao", "", { shouldDirty: false, shouldValidate: false });
+      setValue("pacienteCpf", "", { shouldDirty: false, shouldValidate: false });
     } catch (error) {
       setFeedbackState("error");
       setFeedbackMessage(

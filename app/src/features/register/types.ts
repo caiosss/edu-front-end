@@ -54,4 +54,5 @@ export type RegisterPayload = {
   dataTransplante: string;
   telefone: string;
   relacao: string;
+  pacienteCpf: string;
 };

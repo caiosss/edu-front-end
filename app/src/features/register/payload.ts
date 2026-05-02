@@ -25,6 +25,7 @@ export const buildRegisterPayload = (
         : normalizeDateToISO("1900-01-01"),
     telefone: userType === "CUIDADOR" ? values.cuidadorTelefone : "",
     relacao: userType === "CUIDADOR" ? values.cuidadorRelacao : "",
+    pacienteCpf: userType === "CUIDADOR" ? normalizeCpf(values.pacienteCpf) : "",
   };
 
   if (userType === "PACIENTE") {
