@@ -104,7 +104,7 @@ const mapMedicationMissionToChecklistItem = (
 };
 
 export default function HomeScreen() {
-  const { nome } = useAuth();
+  const { nome, role } = useAuth();
   const { missions, isLoading, errorMessage } = useHomeMissions();
 
   const [takenMedicationIds, setTakenMedicationIds] = useState<string[]>([]);
@@ -177,7 +177,7 @@ export default function HomeScreen() {
 
   const weeklyProgressRatio = weeklyCompletedDays / 7;
   const weeklyProgressWidth = progressTrackWidth * weeklyProgressRatio;
-  const welcomeName = nome ?? "paciente";
+  const welcomeName = role === "Paciente" ? "Paciente" : "Cuidador";
 
   const medicationDescription = useMemo(() => {
     if (errorMessage) {
@@ -214,7 +214,7 @@ export default function HomeScreen() {
     >
       <Animated.View entering={FadeInDown.duration(220)} style={styles.heroCard}>
         <View style={styles.heroHeader}>
-          <Text style={styles.title}>Bem-vindo, {welcomeName}</Text>
+          <Text style={styles.title}>Bem-vindo!</Text>
           <View style={styles.notificationButton}>
             <Bell size={18} color="#2C7BE5" />
           </View>
