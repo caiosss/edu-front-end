@@ -5,10 +5,12 @@ export type PatientProfileResponse = {
   nomeCompleto: string;
   tipoTransplante: string;
   xpAtual: number;
+  nomeCuidadores: string[];
 };
 
 export type CaregiverProfileResponse = {
   nomeCompleto: string;
   relacao: string;
   telefone: string;
+  nomePacientes: string[];
 };

@@ -14,6 +14,17 @@ const asNonNegativeNumber = (value: unknown): number | null => {
   return value;
 };
 
+const asStringArray = (value: unknown): string[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+};
+
 const normalizePatientProfileResponse = (data: unknown): PatientProfileResponse => {
   if (!data || typeof data !== "object") {
     throw new Error("Resposta de paciente invalida.");
@@ -24,6 +35,7 @@ const normalizePatientProfileResponse = (data: unknown): PatientProfileResponse 
     moedas?: unknown;
     nivel?: unknown;
     nomeCompleto?: unknown;
+    nomeCuidadores?: unknown;
     tipoTransplante?: unknown;
     xpAtual?: unknown;
   };
@@ -34,6 +46,7 @@ const normalizePatientProfileResponse = (data: unknown): PatientProfileResponse 
   const moedas = asNonNegativeNumber(parsedData.moedas);
   const nivel = asNonNegativeNumber(parsedData.nivel);
   const xpAtual = asNonNegativeNumber(parsedData.xpAtual);
+  const nomeCuidadores = asStringArray(parsedData.nomeCuidadores);
 
   if (!dataTransplante || !nomeCompleto || !tipoTransplante) {
     throw new Error("Resposta de paciente invalida.");
@@ -48,6 +61,7 @@ const normalizePatientProfileResponse = (data: unknown): PatientProfileResponse 
     moedas,
     nivel,
     nomeCompleto,
+    nomeCuidadores,
     tipoTransplante,
     xpAtual,
   };

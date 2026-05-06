@@ -9,7 +9,7 @@ import {
   type LayoutChangeEvent,
 } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { Bell, Eye, LogOut, Medal, Settings, UserRound } from "lucide-react-native";
+import { Bell, Eye, Heart, LogOut, Medal, Settings, UserRound } from "lucide-react-native";
 import SettingItem from "../features/navigation/components/settings-item";
 import { useAuth } from "../hooks/useAuth";
 import { useCaregiverProfile } from "../hooks/use-caregiver-profile";
@@ -92,6 +92,8 @@ export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScree
     : refreshPatientProfile;
 
   const currentXp = patientProfile?.xpAtual ?? 0;
+  const caregiverNames = patientProfile?.nomeCuidadores ?? [];
+  const patientNames = caregiverProfile?.nomePacientes ?? [];
   const xpProgressRatio = Math.max(0, Math.min((currentXp % XP_PER_LEVEL) / XP_PER_LEVEL, 1));
   const xpProgressWidth = progressTrackWidth * xpProgressRatio;
 
@@ -132,18 +134,38 @@ export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScree
       ) : null}
 
       {isCaregiverUser && caregiverProfile ? (
-        <Animated.View entering={FadeInDown.duration(220)} style={styles.card}>
-          <View style={styles.mainIconBadge}>
-            <UserRound size={34} color="#2C7BE5" />
-          </View>
+        <>
+          <Animated.View entering={FadeInDown.duration(220)} style={styles.card}>
+            <View style={styles.mainIconBadge}>
+              <UserRound size={34} color="#2C7BE5" />
+            </View>
 
-          <Text style={styles.mainName}>{caregiverProfile.nomeCompleto}</Text>
+            <Text style={styles.mainName}>{caregiverProfile.nomeCompleto}</Text>
 
-          <View style={styles.metaGroup}>
-            <ProfileInfoRow label="Relacao" value={caregiverProfile.relacao} />
-            <ProfileInfoRow label="Telefone" value={caregiverProfile.telefone} />
-          </View>
-        </Animated.View>
+            <View style={styles.metaGroup}>
+              <ProfileInfoRow label="Relacao" value={caregiverProfile.relacao} />
+              <ProfileInfoRow label="Telefone" value={caregiverProfile.telefone} />
+            </View>
+          </Animated.View>
+
+          {patientNames.length > 0 ? (
+            <Animated.View entering={FadeInDown.delay(80).duration(230)} style={styles.card}>
+              <View style={styles.cardHeader}>
+                <View style={styles.headerLeft}>
+                  <Heart size={18} color="#2C7BE5" />
+                  <Text style={styles.cardTitle}>Pacientes</Text>
+                </View>
+              </View>
+              <View style={styles.caregiverNamesList}>
+                {patientNames.map((nome, index) => (
+                  <View key={`${nome}-${index}`} style={styles.infoRow}>
+                    <Text style={styles.infoValue}>{nome}</Text>
+                  </View>
+                ))}
+              </View>
+            </Animated.View>
+          ) : null}
+        </>
       ) : null}
 
       {!isCaregiverUser && patientProfile ? (
@@ -184,6 +206,24 @@ export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScree
             <Text style={styles.supportingText}>Voce tem {patientProfile.xpAtual} XP.</Text>
             {/* Moedas devem ser exibidas neste card quando o layout de moedas for adicionado. */}
           </Animated.View>
+
+          {caregiverNames.length > 0 ? (
+            <Animated.View entering={FadeInDown.delay(80).duration(230)} style={styles.card}>
+              <View style={styles.cardHeader}>
+                <View style={styles.headerLeft}>
+                  <Heart size={18} color="#2C7BE5" />
+                  <Text style={styles.cardTitle}>Cuidadores</Text>
+                </View>
+              </View>
+              <View style={styles.caregiverNamesList}>
+                {caregiverNames.map((nome, index) => (
+                  <View key={`${nome}-${index}`} style={styles.infoRow}>
+                    <Text style={styles.infoValue}>{nome}</Text>
+                  </View>
+                ))}
+              </View>
+            </Animated.View>
+          ) : null}
         </>
       ) : null}
 
@@ -356,6 +396,9 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   settingsGroup: {
+    gap: 8,
+  },
+  caregiverNamesList: {
     gap: 8,
   },
   addCaregiverButton: {
