@@ -1,5 +1,6 @@
 import axios from "axios";
 import type {
+  CompleteMissionPayload,
   GeneralMissionResponse,
   MedicationMissionResponse,
   MyMissionsResponse,
@@ -38,6 +39,7 @@ const normalizeGeneralMission = (data: unknown): GeneralMissionResponse => {
   const parsedData = data as {
     ativa?: unknown;
     categoria?: unknown;
+    concluida?: unknown;
     dataInicio?: unknown;
     descricao?: unknown;
     id?: unknown;
@@ -52,6 +54,7 @@ const normalizeGeneralMission = (data: unknown): GeneralMissionResponse => {
   const categoria = asNonEmptyString(parsedData.categoria);
   const dataInicio = asNonEmptyString(parsedData.dataInicio);
   const ativa = asBoolean(parsedData.ativa);
+  const concluida = asBoolean(parsedData.concluida) ?? false;
 
   if (!id || !missaoId || !nome || !categoria || !dataInicio || ativa === null) {
     throw new Error("Resposta de missoes gerais invalida.");
@@ -66,6 +69,7 @@ const normalizeGeneralMission = (data: unknown): GeneralMissionResponse => {
     observacao: asString(parsedData.observacao) ?? "",
     dataInicio,
     ativa,
+    concluida,
   };
 };
 
@@ -174,6 +178,62 @@ export const fetchMyMissions = async (): Promise<MyMissionsResponse> => {
       }
 
       throw new Error(`Falha ao carregar missoes (HTTP ${status}).`);
+    }
+
+    throw error;
+  }
+};
+
+export const completeMission = async (
+  payload: CompleteMissionPayload
+): Promise<void> => {
+  if (!api.defaults.baseURL) {
+    throw new Error(
+      "URL da API nao configurada. Defina EXPO_PUBLIC_API_URL no .env e reinicie o app."
+    );
+  }
+
+  const missaoId = payload.missaoId.trim();
+  const pacienteEmail = payload.pacienteEmail.trim().toLowerCase();
+
+  if (!missaoId) {
+    throw new Error("ID da missao ausente.");
+  }
+
+  if (!pacienteEmail) {
+    throw new Error("Email do paciente ausente.");
+  }
+
+  try {
+    await api.patch("/missoes/concluir", {
+      missaoId,
+      pacienteEmail,
+    });
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+
+      if (status === 401 || status === 403) {
+        throw new Error("Sessao sem permissao para concluir missao.");
+      }
+
+      if (status === 404) {
+        throw new Error("Missao nao encontrada para conclusao.");
+      }
+
+      if (status === 400) {
+        throw new Error("Requisicao invalida ao concluir missao.");
+      }
+
+      if (status && status >= 500) {
+        throw new Error("A API retornou erro interno ao concluir missao.");
+      }
+
+      if (!status) {
+        throw new Error("Nao foi possivel conectar com a API de missoes.");
+      }
+
+      throw new Error(`Falha ao concluir missao (HTTP ${status}).`);
     }
 
     throw error;

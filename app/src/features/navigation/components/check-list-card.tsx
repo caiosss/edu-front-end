@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -75,6 +76,8 @@ type ChecklistCardProps = {
   description?: string;
   items: ChecklistItem[];
   checkedIds: string[];
+  loadingIds?: string[];
+  disabledIds?: string[];
   onToggleItem: (itemId: string) => void;
 };
 
@@ -83,6 +86,8 @@ export default function ChecklistCard({
   description,
   items,
   checkedIds,
+  loadingIds = [],
+  disabledIds = [],
   onToggleItem,
 }: ChecklistCardProps) {
   return (
@@ -93,13 +98,20 @@ export default function ChecklistCard({
       <View style={styles.checklistGroup}>
         {items.map((item) => {
           const isChecked = checkedIds.includes(item.id);
+          const isLoading = loadingIds.includes(item.id);
+          const isDisabled = isLoading || disabledIds.includes(item.id);
           const ItemIcon = item.icon;
 
           return (
             <Animated.View key={item.id} layout={LinearTransition.duration(220)}>
               <Pressable
+                disabled={isDisabled}
                 onPress={() => onToggleItem(item.id)}
-                style={[styles.checklistRow, isChecked ? styles.checklistRowChecked : null]}
+                style={[
+                  styles.checklistRow,
+                  isChecked ? styles.checklistRowChecked : null,
+                  isDisabled ? styles.checklistRowDisabled : null,
+                ]}
               >
                 <View style={styles.checklistLeft}>
                   <View style={[styles.iconBadge, isChecked ? styles.iconBadgeChecked : null]}>
@@ -114,7 +126,9 @@ export default function ChecklistCard({
                 </View>
 
                 <View style={styles.checklistRight}>
-                  {isChecked ? (
+                  {isLoading ? (
+                    <ActivityIndicator size="small" color="#1A6FD6" />
+                  ) : isChecked ? (
                     <CircleCheck size={18} color="#1A6FD6" />
                   ) : (
                     <Circle size={18} color="#7D94AB" />
@@ -125,7 +139,7 @@ export default function ChecklistCard({
                       isChecked ? styles.checkActionLabelDone : null,
                     ]}
                   >
-                    {isChecked ? "Concluído" : "Concluir"}
+                    {isLoading ? "Enviando..." : isChecked ? "Concluído" : "Concluir"}
                   </Text>
                 </View>
               </Pressable>
@@ -216,6 +230,9 @@ const styles = StyleSheet.create({
   },
   checklistRowChecked: {
     backgroundColor: "#E8F2FF",
+  },
+  checklistRowDisabled: {
+    opacity: 0.72,
   },
   checklistLeft: {
     flexDirection: "row",

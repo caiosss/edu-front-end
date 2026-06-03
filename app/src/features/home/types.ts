@@ -7,6 +7,7 @@ export type GeneralMissionResponse = {
   observacao: string;
   dataInicio: string;
   ativa: boolean;
+  concluida: boolean;
 };
 
 export type MedicationMissionResponse = {
@@ -24,4 +25,9 @@ export type MedicationMissionResponse = {
 export type MyMissionsResponse = {
   missoesGerais: GeneralMissionResponse[];
   missoesMedicamento: MedicationMissionResponse[];
+};
+
+export type CompleteMissionPayload = {
+  missaoId: string;
+  pacienteEmail: string;
 };

@@ -4,7 +4,10 @@ import { useAuthStore } from "../store/auth-store";
 type JwtPayload = {
   role?: string;
   roles?: string[];
+  sub?: string;
   email?: string;
+  preferred_username?: string;
+  username?: string;
   nome?: string;
   name?: string;
   [key: string]: unknown;
@@ -48,6 +51,16 @@ const asNonEmptyString = (value: unknown): string | null => {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
 };
 
+const asEmailString = (value: unknown): string | null => {
+  const stringValue = asNonEmptyString(value);
+
+  if (!stringValue || !stringValue.includes("@")) {
+    return null;
+  }
+
+  return stringValue;
+};
+
 const extractRole = (payload: JwtPayload | null): string | null => {
   if (!payload) {
     return null;
@@ -75,7 +88,11 @@ export function useAuth() {
     tipoUsuario,
     isAuthenticated: Boolean(token),
     role: extractRole(payload),
-    email: asNonEmptyString(payload?.email),
+    email:
+      asEmailString(payload?.email) ??
+      asEmailString(payload?.sub) ??
+      asEmailString(payload?.preferred_username) ??
+      asEmailString(payload?.username),
     nome: asNonEmptyString(payload?.nome ?? payload?.name),
     payload,
     setToken,

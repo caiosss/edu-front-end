@@ -23,6 +23,7 @@ import ChecklistCard, {
   type ChecklistItem,
 } from "../features/navigation/components/check-list-card";
 import { useAuth } from "../hooks/useAuth";
+import { useCompleteMission } from "../hooks/use-complete-mission";
 import { useHomeMissions } from "../hooks/use-home-missions";
 
 const formatTimeLabel = (value: string): string => {
@@ -104,8 +105,13 @@ const mapMedicationMissionToChecklistItem = (
 };
 
 export default function HomeScreen() {
-  const { nome, role } = useAuth();
+  const { role } = useAuth();
   const { missions, isLoading, errorMessage } = useHomeMissions();
+  const {
+    completeMission,
+    completingMissionIds,
+    errorMessage: completeMissionErrorMessage,
+  } = useCompleteMission();
 
   const [takenMedicationIds, setTakenMedicationIds] = useState<string[]>([]);
   const [completedMissionIds, setCompletedMissionIds] = useState<string[]>([]);
@@ -131,6 +137,28 @@ export default function HomeScreen() {
       .map(mapGeneralMissionToChecklistItem);
   }, [missions]);
 
+  const completedDailyMissionItemIds = useMemo(() => {
+    if (!missions) {
+      return [];
+    }
+
+    return missions.missoesGerais
+      .filter((mission) => mission.ativa && mission.concluida)
+      .map((mission) => mission.id);
+  }, [missions]);
+
+  const completingDailyMissionItemIds = useMemo(() => {
+    if (!missions) {
+      return [];
+    }
+
+    const completingMissionIdSet = new Set(completingMissionIds);
+
+    return missions.missoesGerais
+      .filter((mission) => completingMissionIdSet.has(mission.missaoId))
+      .map((mission) => mission.id);
+  }, [completingMissionIds, missions]);
+
   useEffect(() => {
     setTakenMedicationIds((currentIds) =>
       currentIds.filter((id) => medicationItems.some((item) => item.id === id))
@@ -138,10 +166,21 @@ export default function HomeScreen() {
   }, [medicationItems]);
 
   useEffect(() => {
+    const activeMissionItemIdSet = new Set(dailyMissionItems.map((item) => item.id));
+    const completedMissionItemIdSet = new Set(completedDailyMissionItemIds);
+
     setCompletedMissionIds((currentIds) =>
-      currentIds.filter((id) => dailyMissionItems.some((item) => item.id === id))
+      Array.from(
+        currentIds.reduce((nextIds, id) => {
+          if (activeMissionItemIdSet.has(id)) {
+            nextIds.add(id);
+          }
+
+          return nextIds;
+        }, completedMissionItemIdSet)
+      )
     );
-  }, [dailyMissionItems]);
+  }, [completedDailyMissionItemIds, dailyMissionItems]);
 
   const toggleMedication = (itemId: string) => {
     setTakenMedicationIds((currentIds) =>
@@ -151,12 +190,29 @@ export default function HomeScreen() {
     );
   };
 
-  const toggleMission = (itemId: string) => {
-    setCompletedMissionIds((currentIds) =>
-      currentIds.includes(itemId)
-        ? currentIds.filter((id) => id !== itemId)
-        : [...currentIds, itemId]
+  const toggleMission = async (itemId: string) => {
+    if (
+      completedMissionIds.includes(itemId) ||
+      completingDailyMissionItemIds.includes(itemId)
+    ) {
+      return;
+    }
+
+    const mission = missions?.missoesGerais.find(
+      (currentMission) => currentMission.id === itemId
     );
+
+    if (!mission) {
+      return;
+    }
+
+    const missionCompleted = await completeMission(mission.missaoId);
+
+    if (missionCompleted) {
+      setCompletedMissionIds((currentIds) =>
+        currentIds.includes(itemId) ? currentIds : [...currentIds, itemId]
+      );
+    }
   };
 
   const weeklyCompletedDays = useMemo(() => {
@@ -181,27 +237,31 @@ export default function HomeScreen() {
 
   const medicationDescription = useMemo(() => {
     if (errorMessage) {
-      return "Nao foi possivel carregar os medicamentos de hoje.";
+      return "Não foi possível carregar os medicamentos de hoje.";
     }
 
     if (isLoading && !missions) {
       return "Carregando seus medicamentos de hoje...";
     }
 
-    return "Acompanhe e marque cada dose no horario certo.";
+    return "Acompanhe e marque cada dose no horário certo.";
   }, [errorMessage, isLoading, missions]);
 
   const missionDescription = useMemo(() => {
+    if (completeMissionErrorMessage) {
+      return completeMissionErrorMessage;
+    }
+
     if (errorMessage) {
-      return "Nao foi possivel carregar as missoes de hoje.";
+      return "Não foi possível carregar as recomendações de hoje.";
     }
 
     if (isLoading && !missions) {
-      return "Carregando suas missoes do dia...";
+      return "Carregando suas recomendações do dia...";
     }
 
-    return "Complete suas missoes para ganhar pontos e evoluir.";
-  }, [errorMessage, isLoading, missions]);
+    return "Complete suas recomendações para ganhar pontos e evoluir.";
+  }, [completeMissionErrorMessage, errorMessage, isLoading, missions]);
 
   const handleProgressTrackLayout = (event: LayoutChangeEvent) => {
     setProgressTrackWidth(event.nativeEvent.layout.width);
@@ -234,10 +294,11 @@ export default function HomeScreen() {
 
       <Animated.View entering={FadeInDown.delay(120).duration(240)}>
         <ChecklistCard
-          title="Missoes do dia"
+          title="Recomendações do dia"
           description={missionDescription}
           items={dailyMissionItems}
           checkedIds={completedMissionIds}
+          loadingIds={completingDailyMissionItemIds}
           onToggleItem={toggleMission}
         />
       </Animated.View>
