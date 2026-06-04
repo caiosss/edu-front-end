@@ -2,32 +2,37 @@ import { useCallback, useRef, useState } from "react";
 import { completeMission as completeMissionRequest } from "../services/missions-service";
 import { useAuth } from "./useAuth";
 
+type CompleteMissionInput = {
+  missaoId?: string;
+  prescricaoId?: string;
+};
+
 type UseCompleteMissionResult = {
-  completingMissionIds: string[];
+  completingMissionKeys: string[];
   errorMessage: string;
   isCompleting: boolean;
   clearCompleteMissionError: () => void;
-  completeMission: (missaoId: string) => Promise<boolean>;
+  completeMission: (input: CompleteMissionInput) => Promise<string | null>;
 };
 
 export function useCompleteMission(): UseCompleteMissionResult {
   const { email } = useAuth();
-  const completingMissionIdsRef = useRef<Set<string>>(new Set());
+  const completingMissionKeysRef = useRef<Set<string>>(new Set());
 
-  const [completingMissionIds, setCompletingMissionIds] = useState<string[]>([]);
+  const [completingMissionKeys, setCompletingMissionKeys] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const setMissionCompleting = useCallback((missaoId: string, isCompleting: boolean) => {
-    const nextCompletingMissionIds = new Set(completingMissionIdsRef.current);
+  const setMissionCompleting = useCallback((missionKey: string, isCompleting: boolean) => {
+    const nextCompletingMissionKeys = new Set(completingMissionKeysRef.current);
 
     if (isCompleting) {
-      nextCompletingMissionIds.add(missaoId);
+      nextCompletingMissionKeys.add(missionKey);
     } else {
-      nextCompletingMissionIds.delete(missaoId);
+      nextCompletingMissionKeys.delete(missionKey);
     }
 
-    completingMissionIdsRef.current = nextCompletingMissionIds;
-    setCompletingMissionIds(Array.from(nextCompletingMissionIds));
+    completingMissionKeysRef.current = nextCompletingMissionKeys;
+    setCompletingMissionKeys(Array.from(nextCompletingMissionKeys));
   }, []);
 
   const clearCompleteMissionError = useCallback(() => {
@@ -35,49 +40,51 @@ export function useCompleteMission(): UseCompleteMissionResult {
   }, []);
 
   const completeMission = useCallback(
-    async (missaoId: string) => {
-      const normalizedMissionId = missaoId.trim();
+    async (input: CompleteMissionInput) => {
+      const normalizedMissionId = input.missaoId?.trim();
+      const normalizedPrescriptionId = input.prescricaoId?.trim();
+      const missionKey = normalizedPrescriptionId || normalizedMissionId;
       const pacienteEmail = email?.trim().toLowerCase();
 
-      if (!normalizedMissionId) {
-        setErrorMessage("ID da missao ausente.");
-        return false;
+      if (!missionKey) {
+        setErrorMessage("ID da missao ou prescricao ausente.");
+        return null;
       }
 
       if (!pacienteEmail) {
         setErrorMessage("Email do paciente ausente na sessao.");
-        return false;
+        return null;
       }
 
-      if (completingMissionIdsRef.current.has(normalizedMissionId)) {
-        return false;
+      if (completingMissionKeysRef.current.has(missionKey)) {
+        return null;
       }
 
-      setMissionCompleting(normalizedMissionId, true);
+      setMissionCompleting(missionKey, true);
       setErrorMessage("");
 
       try {
-        await completeMissionRequest({
+        return await completeMissionRequest({
           missaoId: normalizedMissionId,
+          prescricaoId: normalizedPrescriptionId,
           pacienteEmail,
         });
-        return true;
       } catch (error) {
         setErrorMessage(
           error instanceof Error ? error.message : "Nao foi possivel concluir a missao."
         );
-        return false;
+        return null;
       } finally {
-        setMissionCompleting(normalizedMissionId, false);
+        setMissionCompleting(missionKey, false);
       }
     },
     [email, setMissionCompleting]
   );
 
   return {
-    completingMissionIds,
+    completingMissionKeys,
     errorMessage,
-    isCompleting: completingMissionIds.length > 0,
+    isCompleting: completingMissionKeys.length > 0,
     clearCompleteMissionError,
     completeMission,
   };

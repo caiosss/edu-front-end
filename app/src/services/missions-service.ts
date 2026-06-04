@@ -19,6 +19,27 @@ const asBoolean = (value: unknown): boolean | null => {
   return typeof value === "boolean" ? value : null;
 };
 
+const normalizeCompletionMessage = (data: unknown): string => {
+  if (typeof data === "string" && data.trim().length > 0) {
+    return data.trim();
+  }
+
+  if (!data || typeof data !== "object") {
+    return "Missao concluida com sucesso.";
+  }
+
+  const parsedData = data as {
+    message?: unknown;
+    mensagem?: unknown;
+  };
+
+  return (
+    asNonEmptyString(parsedData.mensagem) ??
+    asNonEmptyString(parsedData.message) ??
+    "Missao concluida com sucesso."
+  );
+};
+
 const asNonNegativeInteger = (value: unknown): number | null => {
   if (typeof value === "number" && Number.isInteger(value) && value >= 0) {
     return value;
@@ -80,6 +101,7 @@ const normalizeMedicationMission = (data: unknown): MedicationMissionResponse =>
 
   const parsedData = data as {
     ativo?: unknown;
+    concluida?: unknown;
     dosagem?: unknown;
     frequenciaHoras?: unknown;
     horarioPrimeiraDose?: unknown;
@@ -97,6 +119,7 @@ const normalizeMedicationMission = (data: unknown): MedicationMissionResponse =>
   const frequenciaHoras = asNonNegativeInteger(parsedData.frequenciaHoras);
   const horarioPrimeiraDose = asNonEmptyString(parsedData.horarioPrimeiraDose);
   const ativo = asBoolean(parsedData.ativo);
+  const concluida = asBoolean(parsedData.concluida) ?? false;
 
   if (
     !id ||
@@ -120,6 +143,7 @@ const normalizeMedicationMission = (data: unknown): MedicationMissionResponse =>
     frequenciaHoras,
     horarioPrimeiraDose,
     ativo,
+    concluida,
   };
 };
 
@@ -186,18 +210,19 @@ export const fetchMyMissions = async (): Promise<MyMissionsResponse> => {
 
 export const completeMission = async (
   payload: CompleteMissionPayload
-): Promise<void> => {
+): Promise<string> => {
   if (!api.defaults.baseURL) {
     throw new Error(
       "URL da API nao configurada. Defina EXPO_PUBLIC_API_URL no .env e reinicie o app."
     );
   }
 
-  const missaoId = payload.missaoId.trim();
+  const missaoId = payload.missaoId?.trim();
+  const prescricaoId = payload.prescricaoId?.trim();
   const pacienteEmail = payload.pacienteEmail.trim().toLowerCase();
 
-  if (!missaoId) {
-    throw new Error("ID da missao ausente.");
+  if (!missaoId && !prescricaoId) {
+    throw new Error("ID da missao ou prescricao ausente.");
   }
 
   if (!pacienteEmail) {
@@ -205,10 +230,12 @@ export const completeMission = async (
   }
 
   try {
-    await api.patch("/missoes/concluir", {
+    const response = await api.patch("/missoes/concluir", {
       missaoId,
+      prescricaoId,
       pacienteEmail,
     });
+    return normalizeCompletionMessage(response.data);
   } catch (error) {
     if (axios.isAxiosError(error)) {
       const status = error.response?.status;

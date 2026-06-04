@@ -203,7 +203,7 @@ export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScree
             <View style={styles.progressTrack} onLayout={handleProgressTrackLayout}>
               <View style={[styles.progressFill, { width: xpProgressWidth }]} />
             </View>
-            <Text style={styles.supportingText}>Voce tem {patientProfile.xpAtual} XP.</Text>
+            <Text style={styles.supportingText}>Você tem {patientProfile.xpAtual} de pontos de experiência!</Text>
             {/* Moedas devem ser exibidas neste card quando o layout de moedas for adicionado. */}
           </Animated.View>
 

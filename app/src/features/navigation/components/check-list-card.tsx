@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import Animated, { FadeInDown, LinearTransition } from "react-native-reanimated";
 import {
+  AlertTriangle,
   Bell,
   Circle,
   CircleCheck,
@@ -25,6 +26,13 @@ export type ChecklistItem = {
   title: string;
   subtitle?: string;
   icon: LucideIcon;
+  notice?: ChecklistItemNotice;
+  disabledLabel?: string;
+};
+
+export type ChecklistItemNotice = {
+  message: string;
+  tone: "danger" | "info";
 };
 
 export const medications: ChecklistItem[] = [
@@ -81,6 +89,19 @@ type ChecklistCardProps = {
   onToggleItem: (itemId: string) => void;
 };
 
+function ChecklistNotice({ notice }: { notice: ChecklistItemNotice }) {
+  const isDanger = notice.tone === "danger";
+
+  return (
+    <View style={styles.noticeRow}>
+      <AlertTriangle size={12} color={isDanger ? "#C92A2A" : "#4F6982"} />
+      <Text style={[styles.noticeText, isDanger ? styles.noticeTextDanger : null]}>
+        {notice.message}
+      </Text>
+    </View>
+  );
+}
+
 export default function ChecklistCard({
   title,
   description,
@@ -100,7 +121,18 @@ export default function ChecklistCard({
           const isChecked = checkedIds.includes(item.id);
           const isLoading = loadingIds.includes(item.id);
           const isDisabled = isLoading || disabledIds.includes(item.id);
+          const notice = !isChecked ? item.notice : undefined;
+          const isDanger = notice?.tone === "danger";
           const ItemIcon = item.icon;
+          const iconColor = isChecked ? "#1A6FD6" : isDanger ? "#C92A2A" : "#4F6982";
+          const actionLabel =
+            isLoading
+              ? "Enviando..."
+              : isChecked
+                ? "Concluído"
+                : isDisabled && item.disabledLabel
+                  ? item.disabledLabel
+                  : "Concluir";
 
           return (
             <Animated.View key={item.id} layout={LinearTransition.duration(220)}>
@@ -109,19 +141,27 @@ export default function ChecklistCard({
                 onPress={() => onToggleItem(item.id)}
                 style={[
                   styles.checklistRow,
+                  isDanger ? styles.checklistRowDanger : null,
                   isChecked ? styles.checklistRowChecked : null,
                   isDisabled ? styles.checklistRowDisabled : null,
                 ]}
               >
                 <View style={styles.checklistLeft}>
-                  <View style={[styles.iconBadge, isChecked ? styles.iconBadgeChecked : null]}>
-                    <ItemIcon size={15} color={isChecked ? "#1A6FD6" : "#4F6982"} />
+                  <View
+                    style={[
+                      styles.iconBadge,
+                      isDanger ? styles.iconBadgeDanger : null,
+                      isChecked ? styles.iconBadgeChecked : null,
+                    ]}
+                  >
+                    <ItemIcon size={15} color={iconColor} />
                   </View>
                   <View style={styles.checklistTextBlock}>
                     <Text style={styles.checklistTitle}>{item.title}</Text>
                     {item.subtitle ? (
                       <Text style={styles.checklistSubtitle}>{item.subtitle}</Text>
                     ) : null}
+                    {notice ? <ChecklistNotice notice={notice} /> : null}
                   </View>
                 </View>
 
@@ -130,6 +170,8 @@ export default function ChecklistCard({
                     <ActivityIndicator size="small" color="#1A6FD6" />
                   ) : isChecked ? (
                     <CircleCheck size={18} color="#1A6FD6" />
+                  ) : isDanger ? (
+                    <Circle size={18} color="#C92A2A" />
                   ) : (
                     <Circle size={18} color="#7D94AB" />
                   )}
@@ -137,9 +179,10 @@ export default function ChecklistCard({
                     style={[
                       styles.checkActionLabel,
                       isChecked ? styles.checkActionLabelDone : null,
+                      isDanger ? styles.checkActionLabelDanger : null,
                     ]}
                   >
-                    {isLoading ? "Enviando..." : isChecked ? "Concluído" : "Concluir"}
+                    {actionLabel}
                   </Text>
                 </View>
               </Pressable>
@@ -219,6 +262,8 @@ const styles = StyleSheet.create({
   },
   checklistRow: {
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "transparent",
     minHeight: 58,
     paddingHorizontal: 10,
     paddingVertical: 8,
@@ -230,6 +275,10 @@ const styles = StyleSheet.create({
   },
   checklistRowChecked: {
     backgroundColor: "#E8F2FF",
+  },
+  checklistRowDanger: {
+    borderColor: "#FFB4AB",
+    backgroundColor: "#FFF1F1",
   },
   checklistRowDisabled: {
     opacity: 0.72,
@@ -251,6 +300,9 @@ const styles = StyleSheet.create({
   iconBadgeChecked: {
     backgroundColor: "#CEE4FF",
   },
+  iconBadgeDanger: {
+    backgroundColor: "#FFE3E3",
+  },
   checklistTextBlock: {
     flex: 1,
     gap: 2,
@@ -263,6 +315,22 @@ const styles = StyleSheet.create({
   checklistSubtitle: {
     color: "#5B738A",
     fontSize: 12,
+  },
+  noticeRow: {
+    marginTop: 3,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  noticeText: {
+    flex: 1,
+    color: "#4F6982",
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  noticeTextDanger: {
+    color: "#C92A2A",
+    fontWeight: "600",
   },
   checklistRight: {
     alignItems: "center",
@@ -278,6 +346,10 @@ const styles = StyleSheet.create({
   },
   checkActionLabelDone: {
     color: "#1A6FD6",
+    fontWeight: "700",
+  },
+  checkActionLabelDanger: {
+    color: "#C92A2A",
     fontWeight: "700",
   },
 });

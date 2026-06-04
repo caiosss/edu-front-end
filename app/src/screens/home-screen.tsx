@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -19,28 +19,18 @@ import type {
   GeneralMissionResponse,
   MedicationMissionResponse,
 } from "../features/home/types";
+import { MissionCompletionFeedback } from "../features/home/components/mission-completion-feedback";
+import {
+  formatMedicationTimeLabel,
+  getMedicationScheduleInfo,
+  type MedicationScheduleInfo,
+} from "../features/home/utils/medication-schedule";
 import ChecklistCard, {
   type ChecklistItem,
 } from "../features/navigation/components/check-list-card";
 import { useAuth } from "../hooks/useAuth";
 import { useCompleteMission } from "../hooks/use-complete-mission";
 import { useHomeMissions } from "../hooks/use-home-missions";
-
-const formatTimeLabel = (value: string): string => {
-  const normalizedTime = value.trim();
-
-  if (!normalizedTime) {
-    return "";
-  }
-
-  const parsedTime = normalizedTime.match(/^(\d{2}):(\d{2})(?::\d{2})?$/);
-
-  if (parsedTime) {
-    return `${parsedTime[1]}:${parsedTime[2]}`;
-  }
-
-  return normalizedTime;
-};
 
 const resolveMissionIcon = (categoria: string): LucideIcon => {
   const normalizedCategory = categoria.trim().toUpperCase();
@@ -78,7 +68,8 @@ const mapGeneralMissionToChecklistItem = (
 };
 
 const mapMedicationMissionToChecklistItem = (
-  mission: MedicationMissionResponse
+  mission: MedicationMissionResponse,
+  scheduleInfo?: MedicationScheduleInfo
 ): ChecklistItem => {
   const subtitleParts: string[] = [];
 
@@ -86,7 +77,8 @@ const mapMedicationMissionToChecklistItem = (
     subtitleParts.push(mission.dosagem.trim());
   }
 
-  const firstDoseTime = formatTimeLabel(mission.horarioPrimeiraDose);
+  const firstDoseTime =
+    scheduleInfo?.scheduledTimeLabel ?? formatMedicationTimeLabel(mission.horarioPrimeiraDose);
 
   if (firstDoseTime) {
     subtitleParts.push(firstDoseTime);
@@ -101,6 +93,14 @@ const mapMedicationMissionToChecklistItem = (
     title: mission.nomeMedicamento,
     subtitle: subtitleParts.length > 0 ? subtitleParts.join(" - ") : undefined,
     icon: Pill,
+    disabledLabel: scheduleInfo?.disabledLabel,
+    notice:
+      scheduleInfo?.noticeMessage && scheduleInfo.noticeTone
+        ? {
+            message: scheduleInfo.noticeMessage,
+            tone: scheduleInfo.noticeTone,
+          }
+        : undefined,
   };
 };
 
@@ -109,13 +109,59 @@ export default function HomeScreen() {
   const { missions, isLoading, errorMessage } = useHomeMissions();
   const {
     completeMission,
-    completingMissionIds,
+    completingMissionKeys,
     errorMessage: completeMissionErrorMessage,
   } = useCompleteMission();
 
   const [takenMedicationIds, setTakenMedicationIds] = useState<string[]>([]);
   const [completedMissionIds, setCompletedMissionIds] = useState<string[]>([]);
+  const [completionFeedback, setCompletionFeedback] = useState<{
+    id: number;
+    message: string;
+  } | null>(null);
+  const [completionErrorSection, setCompletionErrorSection] = useState<
+    "medication" | "mission" | null
+  >(null);
   const [progressTrackWidth, setProgressTrackWidth] = useState(0);
+  const [currentDate, setCurrentDate] = useState(() => new Date());
+
+  const hideCompletionFeedback = useCallback(() => {
+    setCompletionFeedback(null);
+  }, []);
+
+  const showCompletionFeedback = useCallback((message: string) => {
+    setCompletionFeedback({
+      id: Date.now(),
+      message,
+    });
+  }, []);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setCurrentDate(new Date());
+    }, 60000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, []);
+
+  const medicationScheduleById = useMemo(() => {
+    const scheduleById = new Map<string, MedicationScheduleInfo>();
+
+    if (!missions) {
+      return scheduleById;
+    }
+
+    missions.missoesMedicamento.forEach((mission) => {
+      scheduleById.set(
+        mission.id,
+        getMedicationScheduleInfo(mission.horarioPrimeiraDose, currentDate)
+      );
+    });
+
+    return scheduleById;
+  }, [currentDate, missions]);
 
   const medicationItems = useMemo(() => {
     if (!missions) {
@@ -124,8 +170,13 @@ export default function HomeScreen() {
 
     return missions.missoesMedicamento
       .filter((mission) => mission.ativo)
-      .map(mapMedicationMissionToChecklistItem);
-  }, [missions]);
+      .map((mission) =>
+        mapMedicationMissionToChecklistItem(
+          mission,
+          medicationScheduleById.get(mission.id)
+        )
+      );
+  }, [medicationScheduleById, missions]);
 
   const dailyMissionItems = useMemo(() => {
     if (!missions) {
@@ -147,23 +198,92 @@ export default function HomeScreen() {
       .map((mission) => mission.id);
   }, [missions]);
 
+  const completedMedicationItemIds = useMemo(() => {
+    if (!missions) {
+      return [];
+    }
+
+    return missions.missoesMedicamento
+      .filter((mission) => mission.ativo && mission.concluida)
+      .map((mission) => mission.id);
+  }, [missions]);
+
   const completingDailyMissionItemIds = useMemo(() => {
     if (!missions) {
       return [];
     }
 
-    const completingMissionIdSet = new Set(completingMissionIds);
+    const completingMissionKeySet = new Set(completingMissionKeys);
 
     return missions.missoesGerais
-      .filter((mission) => completingMissionIdSet.has(mission.missaoId))
+      .filter(
+        (mission) =>
+          completingMissionKeySet.has(mission.id) ||
+          completingMissionKeySet.has(mission.missaoId)
+      )
       .map((mission) => mission.id);
-  }, [completingMissionIds, missions]);
+  }, [completingMissionKeys, missions]);
+
+  const completingMedicationItemIds = useMemo(() => {
+    if (!missions) {
+      return [];
+    }
+
+    const completingMissionKeySet = new Set(completingMissionKeys);
+
+    return missions.missoesMedicamento
+      .filter((mission) => completingMissionKeySet.has(mission.id))
+      .map((mission) => mission.id);
+  }, [completingMissionKeys, missions]);
+
+  const blockedMedicationItemIds = useMemo(() => {
+    if (!missions) {
+      return [];
+    }
+
+    return missions.missoesMedicamento
+      .filter(
+        (mission) =>
+          mission.ativo &&
+          !takenMedicationIds.includes(mission.id) &&
+          medicationScheduleById.get(mission.id)?.status === "blocked"
+      )
+      .map((mission) => mission.id);
+  }, [medicationScheduleById, missions, takenMedicationIds]);
+
+  const hasOverdueMedication = useMemo(() => {
+    if (!missions) {
+      return false;
+    }
+
+    return missions.missoesMedicamento.some(
+      (mission) =>
+        mission.ativo &&
+        !takenMedicationIds.includes(mission.id) &&
+        medicationScheduleById.get(mission.id)?.status === "overdue"
+    );
+  }, [medicationScheduleById, missions, takenMedicationIds]);
 
   useEffect(() => {
-    setTakenMedicationIds((currentIds) =>
-      currentIds.filter((id) => medicationItems.some((item) => item.id === id))
+    const activeMedicationItemIdSet = new Set(
+      missions?.missoesMedicamento
+        .filter((mission) => mission.ativo)
+        .map((mission) => mission.id) ?? []
     );
-  }, [medicationItems]);
+    const completedMedicationItemIdSet = new Set(completedMedicationItemIds);
+
+    setTakenMedicationIds((currentIds) =>
+      Array.from(
+        currentIds.reduce((nextIds, id) => {
+          if (activeMedicationItemIdSet.has(id)) {
+            nextIds.add(id);
+          }
+
+          return nextIds;
+        }, completedMedicationItemIdSet)
+      )
+    );
+  }, [completedMedicationItemIds, missions]);
 
   useEffect(() => {
     const activeMissionItemIdSet = new Set(dailyMissionItems.map((item) => item.id));
@@ -182,12 +302,45 @@ export default function HomeScreen() {
     );
   }, [completedDailyMissionItemIds, dailyMissionItems]);
 
-  const toggleMedication = (itemId: string) => {
-    setTakenMedicationIds((currentIds) =>
-      currentIds.includes(itemId)
-        ? currentIds.filter((id) => id !== itemId)
-        : [...currentIds, itemId]
+  const toggleMedication = async (itemId: string) => {
+    if (
+      takenMedicationIds.includes(itemId) ||
+      completingMedicationItemIds.includes(itemId)
+    ) {
+      return;
+    }
+
+    const medicationMission = missions?.missoesMedicamento.find(
+      (currentMission) => currentMission.id === itemId
     );
+
+    if (!medicationMission) {
+      return;
+    }
+
+    const scheduleInfo =
+      medicationScheduleById.get(medicationMission.id) ??
+      getMedicationScheduleInfo(medicationMission.horarioPrimeiraDose, currentDate);
+
+    if (scheduleInfo.isBlocked) {
+      return;
+    }
+
+    setCompletionErrorSection(null);
+
+    const completionMessage = await completeMission({
+      prescricaoId: medicationMission.id,
+    });
+
+    if (completionMessage) {
+      setTakenMedicationIds((currentIds) =>
+        currentIds.includes(itemId) ? currentIds : [...currentIds, itemId]
+      );
+      setCompletionErrorSection(null);
+      showCompletionFeedback(completionMessage);
+    } else {
+      setCompletionErrorSection("medication");
+    }
   };
 
   const toggleMission = async (itemId: string) => {
@@ -206,12 +359,20 @@ export default function HomeScreen() {
       return;
     }
 
-    const missionCompleted = await completeMission(mission.missaoId);
+    setCompletionErrorSection(null);
 
-    if (missionCompleted) {
+    const completionMessage = await completeMission({
+      missaoId: mission.missaoId,
+    });
+
+    if (completionMessage) {
       setCompletedMissionIds((currentIds) =>
         currentIds.includes(itemId) ? currentIds : [...currentIds, itemId]
       );
+      setCompletionErrorSection(null);
+      showCompletionFeedback(completionMessage);
+    } else {
+      setCompletionErrorSection("mission");
     }
   };
 
@@ -236,6 +397,10 @@ export default function HomeScreen() {
   const welcomeName = role === "Paciente" ? "Paciente" : "Cuidador";
 
   const medicationDescription = useMemo(() => {
+    if (completionErrorSection === "medication" && completeMissionErrorMessage) {
+      return completeMissionErrorMessage;
+    }
+
     if (errorMessage) {
       return "Não foi possível carregar os medicamentos de hoje.";
     }
@@ -244,11 +409,27 @@ export default function HomeScreen() {
       return "Carregando seus medicamentos de hoje...";
     }
 
+    if (hasOverdueMedication) {
+      return "Confira os medicamentos em vermelho: o horario ja passou.";
+    }
+
+    if (blockedMedicationItemIds.length > 0) {
+      return "Alguns medicamentos ainda nao chegaram ao horario de conclusao.";
+    }
+
     return "Acompanhe e marque cada dose no horário certo.";
-  }, [errorMessage, isLoading, missions]);
+  }, [
+    blockedMedicationItemIds.length,
+    completeMissionErrorMessage,
+    completionErrorSection,
+    errorMessage,
+    hasOverdueMedication,
+    isLoading,
+    missions,
+  ]);
 
   const missionDescription = useMemo(() => {
-    if (completeMissionErrorMessage) {
+    if (completionErrorSection === "mission" && completeMissionErrorMessage) {
       return completeMissionErrorMessage;
     }
 
@@ -261,17 +442,24 @@ export default function HomeScreen() {
     }
 
     return "Complete suas recomendações para ganhar pontos e evoluir.";
-  }, [completeMissionErrorMessage, errorMessage, isLoading, missions]);
+  }, [
+    completeMissionErrorMessage,
+    completionErrorSection,
+    errorMessage,
+    isLoading,
+    missions,
+  ]);
 
   const handleProgressTrackLayout = (event: LayoutChangeEvent) => {
     setProgressTrackWidth(event.nativeEvent.layout.width);
   };
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-    >
+    <View style={styles.container}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
       <Animated.View entering={FadeInDown.duration(220)} style={styles.heroCard}>
         <View style={styles.heroHeader}>
           <Text style={styles.title}>Bem-vindo!</Text>
@@ -288,6 +476,8 @@ export default function HomeScreen() {
           description={medicationDescription}
           items={medicationItems}
           checkedIds={takenMedicationIds}
+          loadingIds={completingMedicationItemIds}
+          disabledIds={blockedMedicationItemIds}
           onToggleItem={toggleMedication}
         />
       </Animated.View>
@@ -319,11 +509,22 @@ export default function HomeScreen() {
           <CircleStar size={18} color="#2C7BE5" />
         </View>
       </Animated.View>
-    </ScrollView>
+      </ScrollView>
+
+      <MissionCompletionFeedback
+        animationKey={completionFeedback?.id ?? 0}
+        message={completionFeedback?.message ?? ""}
+        visible={Boolean(completionFeedback)}
+        onHide={hideCompletionFeedback}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 18,

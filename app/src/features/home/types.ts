@@ -20,6 +20,7 @@ export type MedicationMissionResponse = {
   frequenciaHoras: number;
   horarioPrimeiraDose: string;
   ativo: boolean;
+  concluida: boolean;
 };
 
 export type MyMissionsResponse = {
@@ -28,6 +29,7 @@ export type MyMissionsResponse = {
 };
 
 export type CompleteMissionPayload = {
-  missaoId: string;
+  missaoId?: string;
+  prescricaoId?: string;
   pacienteEmail: string;
 };

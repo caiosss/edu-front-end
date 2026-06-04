@@ -27,12 +27,12 @@ export const authenticatedRoutes: AuthenticatedRoute[] = [
     icon: House,
     component: HomeScreen,
   },
-  {
-    key: "progresso",
-    label: "Progresso",
-    icon: Medal,
-    component: ProgressScreen,
-  },
+  // {
+  //   key: "progresso",
+  //   label: "Progresso",
+  //   icon: Medal,
+  //   component: ProgressScreen,
+  // },
   {
     key: "perfil",
     label: "Perfil",
