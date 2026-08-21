@@ -1,6 +1,5 @@
 import { useCallback, useRef, useState } from "react";
 import { completeMission as completeMissionRequest } from "../services/missions-service";
-import { useAuth } from "./useAuth";
 
 type CompleteMissionInput = {
   missaoId?: string;
@@ -16,7 +15,6 @@ type UseCompleteMissionResult = {
 };
 
 export function useCompleteMission(): UseCompleteMissionResult {
-  const { email } = useAuth();
   const completingMissionKeysRef = useRef<Set<string>>(new Set());
 
   const [completingMissionKeys, setCompletingMissionKeys] = useState<string[]>([]);
@@ -44,15 +42,9 @@ export function useCompleteMission(): UseCompleteMissionResult {
       const normalizedMissionId = input.missaoId?.trim();
       const normalizedPrescriptionId = input.prescricaoId?.trim();
       const missionKey = normalizedPrescriptionId || normalizedMissionId;
-      const pacienteEmail = email?.trim().toLowerCase();
 
       if (!missionKey) {
         setErrorMessage("ID da missao ou prescricao ausente.");
-        return null;
-      }
-
-      if (!pacienteEmail) {
-        setErrorMessage("Email do paciente ausente na sessao.");
         return null;
       }
 
@@ -67,7 +59,6 @@ export function useCompleteMission(): UseCompleteMissionResult {
         return await completeMissionRequest({
           missaoId: normalizedMissionId,
           prescricaoId: normalizedPrescriptionId,
-          pacienteEmail,
         });
       } catch (error) {
         setErrorMessage(
@@ -78,7 +69,7 @@ export function useCompleteMission(): UseCompleteMissionResult {
         setMissionCompleting(missionKey, false);
       }
     },
-    [email, setMissionCompleting]
+    [setMissionCompleting]
   );
 
   return {

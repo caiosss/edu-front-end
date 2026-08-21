@@ -1,4 +1,5 @@
 export type PatientProfileResponse = {
+  id: string;
   dataTransplante: string;
   moedas: number;
   nivel: number;
@@ -9,6 +10,7 @@ export type PatientProfileResponse = {
 };
 
 export type CaregiverProfileResponse = {
+  id: string;
   nomeCompleto: string;
   relacao: string;
   telefone: string;

@@ -6,6 +6,7 @@ import type {
   MyMissionsResponse,
 } from "../features/home/types";
 import { api } from "./api";
+import { fetchCurrentPatientId } from "./patient-service";
 
 const asNonEmptyString = (value: unknown): string | null => {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
@@ -65,13 +66,16 @@ const normalizeGeneralMission = (data: unknown): GeneralMissionResponse => {
     descricao?: unknown;
     id?: unknown;
     missaoId?: unknown;
+    missaoNome?: unknown;
+    missaoDescricao?: unknown;
     nome?: unknown;
     observacao?: unknown;
   };
 
   const id = asNonEmptyString(parsedData.id);
   const missaoId = asNonEmptyString(parsedData.missaoId);
-  const nome = asNonEmptyString(parsedData.nome);
+  const nome =
+    asNonEmptyString(parsedData.missaoNome) ?? asNonEmptyString(parsedData.nome);
   const categoria = asNonEmptyString(parsedData.categoria);
   const dataInicio = asNonEmptyString(parsedData.dataInicio);
   const ativa = asBoolean(parsedData.ativa);
@@ -85,7 +89,8 @@ const normalizeGeneralMission = (data: unknown): GeneralMissionResponse => {
     id,
     missaoId,
     nome,
-    descricao: asString(parsedData.descricao) ?? "",
+    descricao:
+      asString(parsedData.missaoDescricao) ?? asString(parsedData.descricao) ?? "",
     categoria,
     observacao: asString(parsedData.observacao) ?? "",
     dataInicio,
@@ -102,28 +107,32 @@ const normalizeMedicationMission = (data: unknown): MedicationMissionResponse =>
   const parsedData = data as {
     ativo?: unknown;
     concluida?: unknown;
+    concluido?: unknown;
     dosagem?: unknown;
     frequenciaHoras?: unknown;
     horarioPrimeiraDose?: unknown;
     id?: unknown;
     nomeMedicamento?: unknown;
     nomePaciente?: unknown;
+    pacienteId?: unknown;
     tipoMedicamento?: unknown;
     userId?: unknown;
   };
 
   const id = asNonEmptyString(parsedData.id);
-  const userId = asNonEmptyString(parsedData.userId);
+  const pacienteId =
+    asNonEmptyString(parsedData.pacienteId) ?? asNonEmptyString(parsedData.userId);
   const nomePaciente = asNonEmptyString(parsedData.nomePaciente);
   const nomeMedicamento = asNonEmptyString(parsedData.nomeMedicamento);
   const frequenciaHoras = asNonNegativeInteger(parsedData.frequenciaHoras);
   const horarioPrimeiraDose = asNonEmptyString(parsedData.horarioPrimeiraDose);
   const ativo = asBoolean(parsedData.ativo);
-  const concluida = asBoolean(parsedData.concluida) ?? false;
+  const concluida =
+    asBoolean(parsedData.concluido) ?? asBoolean(parsedData.concluida) ?? false;
 
   if (
     !id ||
-    !userId ||
+    !pacienteId ||
     !nomePaciente ||
     !nomeMedicamento ||
     frequenciaHoras === null ||
@@ -135,7 +144,7 @@ const normalizeMedicationMission = (data: unknown): MedicationMissionResponse =>
 
   return {
     id,
-    userId,
+    pacienteId,
     nomePaciente,
     nomeMedicamento,
     tipoMedicamento: asString(parsedData.tipoMedicamento) ?? "",
@@ -153,55 +162,64 @@ const normalizeMyMissionsResponse = (data: unknown): MyMissionsResponse => {
   }
 
   const parsedData = data as {
+    missoes?: unknown;
+    prescricoes?: unknown;
     missoesGerais?: unknown;
     missoesMedicamento?: unknown;
   };
 
-  if (!Array.isArray(parsedData.missoesGerais) || !Array.isArray(parsedData.missoesMedicamento)) {
+  const generalMissions = parsedData.missoes ?? parsedData.missoesGerais;
+  const medicationMissions =
+    parsedData.prescricoes ?? parsedData.missoesMedicamento;
+
+  if (!Array.isArray(generalMissions) || !Array.isArray(medicationMissions)) {
     throw new Error("Resposta de missoes invalida.");
   }
 
   return {
-    missoesGerais: parsedData.missoesGerais.map(normalizeGeneralMission),
-    missoesMedicamento: parsedData.missoesMedicamento.map(normalizeMedicationMission),
+    missoesGerais: generalMissions.map(normalizeGeneralMission),
+    missoesMedicamento: medicationMissions.map(normalizeMedicationMission),
   };
 };
 
 export const fetchMyMissions = async (): Promise<MyMissionsResponse> => {
   if (!api.defaults.baseURL) {
     throw new Error(
-      "URL da API nao configurada. Defina EXPO_PUBLIC_API_URL no .env e reinicie o app."
+      "Erro ao carregar missões."
     );
   }
 
   try {
-    const response = await api.get("/missoes/minhas");
+    const pacienteId = await fetchCurrentPatientId();
+    const response = await api.get("/missoes/minhas", {
+      params: { pacienteId },
+    });
     return normalizeMyMissionsResponse(response.data);
   } catch (error) {
     if (axios.isAxiosError(error)) {
       const status = error.response?.status;
 
       if (status === 401 || status === 403) {
-        throw new Error("Sessao sem permissao para carregar missoes.");
+        throw new Error("Sessão sem permissão para carregar missões.");
       }
 
       if (status === 404) {
-        throw new Error("Nenhuma missao encontrada para este usuario.");
+        throw new Error("Nenhuma missão encontrada para este usuário.");
       }
 
       if (status === 400) {
-        throw new Error("Requisicao invalida ao carregar missoes.");
+        throw new Error("Requisição invalida ao carregar missões.");
       }
 
       if (status && status >= 500) {
-        throw new Error("A API retornou erro interno ao carregar missoes.");
+        throw new Error("A API retornou erro interno ao carregar missões.");
       }
 
       if (!status) {
-        throw new Error("Nao foi possivel conectar com a API de missoes.");
+        throw new Error("Não foi possível conectar com a API de missões.");
       }
 
-      throw new Error(`Falha ao carregar missoes (HTTP ${status}).`);
+      throw new Error(`Falha ao carregar missões (HTTP ${status}).`);
     }
 
     throw error;
@@ -213,27 +231,22 @@ export const completeMission = async (
 ): Promise<string> => {
   if (!api.defaults.baseURL) {
     throw new Error(
-      "URL da API nao configurada. Defina EXPO_PUBLIC_API_URL no .env e reinicie o app."
+      "Erro ao concluir missão."
     );
   }
 
   const missaoId = payload.missaoId?.trim();
   const prescricaoId = payload.prescricaoId?.trim();
-  const pacienteEmail = payload.pacienteEmail.trim().toLowerCase();
-
   if (!missaoId && !prescricaoId) {
     throw new Error("ID da missao ou prescricao ausente.");
   }
 
-  if (!pacienteEmail) {
-    throw new Error("Email do paciente ausente.");
-  }
-
   try {
-    const response = await api.patch("/missoes/concluir", {
+    const pacienteId = await fetchCurrentPatientId();
+    const response = await api.post("/missoes/concluir", {
+      pacienteId,
       missaoId,
       prescricaoId,
-      pacienteEmail,
     });
     return normalizeCompletionMessage(response.data);
   } catch (error) {
@@ -241,26 +254,26 @@ export const completeMission = async (
       const status = error.response?.status;
 
       if (status === 401 || status === 403) {
-        throw new Error("Sessao sem permissao para concluir missao.");
+        throw new Error("Sessão sem permissão para concluir missão.");
       }
 
       if (status === 404) {
-        throw new Error("Missao nao encontrada para conclusao.");
+        throw new Error("Missão não encontrada para conclusão.");
       }
 
       if (status === 400) {
-        throw new Error("Requisicao invalida ao concluir missao.");
+        throw new Error("Requisição inválida ao concluir missão.");
       }
 
       if (status && status >= 500) {
-        throw new Error("A API retornou erro interno ao concluir missao.");
+        throw new Error("A API retornou erro interno ao concluir missão.");
       }
 
       if (!status) {
-        throw new Error("Nao foi possivel conectar com a API de missoes.");
+        throw new Error("Não foi possível conectar com a API de missões.");
       }
 
-      throw new Error(`Falha ao concluir missao (HTTP ${status}).`);
+      throw new Error(`Falha ao concluir missão (HTTP ${status}).`);
     }
 
     throw error;

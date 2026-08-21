@@ -1,7 +1,7 @@
 import axios, { AxiosHeaders, type InternalAxiosRequestConfig } from "axios";
 import { useAuthStore } from "../store/auth-store";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
+const API_URL = process.env.EXPO_PUBLIC_API_URL?.trim().replace(/\/+$/, "");
 
 export const api = axios.create({
   baseURL: API_URL,
@@ -13,19 +13,15 @@ export const api = axios.create({
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = useAuthStore.getState().token;
 
-  if (!token) {
-    return config;
+  const headers =
+    config.headers instanceof AxiosHeaders
+      ? config.headers
+      : AxiosHeaders.from(config.headers);
+
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const authorizationValue = `Bearer ${token}`;
-
-  if (config.headers instanceof AxiosHeaders) {
-    config.headers.set("Authorization", authorizationValue);
-    return config;
-  }
-
-  const headers = AxiosHeaders.from(config.headers);
-  headers.set("Authorization", authorizationValue);
   config.headers = headers;
 
   return config;

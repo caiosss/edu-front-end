@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { CaregiverProfileResponse } from "../features/profile/types";
-import { fetchCaregiverProfileById } from "../services/caregiver-service";
+import { fetchCurrentCaregiverProfile } from "../services/caregiver-service";
 import { useAuthStore } from "../store/auth-store";
 
 type UseCaregiverProfileOptions = {
@@ -18,7 +18,7 @@ export function useCaregiverProfile(
   options: UseCaregiverProfileOptions = {}
 ): UseCaregiverProfileResult {
   const { enabled = true } = options;
-  const caregiverId = useAuthStore((state) => state.id);
+  const token = useAuthStore((state) => state.token);
 
   const [caregiverProfile, setCaregiverProfile] =
     useState<CaregiverProfileResponse | null>(null);
@@ -33,9 +33,9 @@ export function useCaregiverProfile(
       return;
     }
 
-    if (!caregiverId) {
+    if (!token) {
       setCaregiverProfile(null);
-      setErrorMessage("Sessao sem ID de cuidador.");
+      setErrorMessage("Sessao nao autenticada para carregar o cuidador.");
       return;
     }
 
@@ -43,7 +43,7 @@ export function useCaregiverProfile(
     setErrorMessage("");
 
     try {
-      const profile = await fetchCaregiverProfileById(caregiverId);
+      const profile = await fetchCurrentCaregiverProfile();
       setCaregiverProfile(profile);
     } catch (error) {
       setCaregiverProfile(null);
@@ -55,7 +55,7 @@ export function useCaregiverProfile(
     } finally {
       setIsLoading(false);
     }
-  }, [enabled, caregiverId]);
+  }, [enabled, token]);
 
   useEffect(() => {
     void refreshCaregiverProfile();

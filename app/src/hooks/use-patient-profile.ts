@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { PatientProfileResponse } from "../features/profile/types";
 import { useAuthStore } from "../store/auth-store";
-import { fetchPatientProfileById } from "../services/patient-service";
+import { fetchCurrentPatientProfile } from "../services/patient-service";
 
 type UsePatientProfileOptions = {
   enabled?: boolean;
@@ -18,7 +18,7 @@ export function usePatientProfile(
   options: UsePatientProfileOptions = {}
 ): UsePatientProfileResult {
   const { enabled = true } = options;
-  const patientId = useAuthStore((state) => state.id);
+  const token = useAuthStore((state) => state.token);
 
   const [patientProfile, setPatientProfile] = useState<PatientProfileResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -32,9 +32,9 @@ export function usePatientProfile(
       return;
     }
 
-    if (!patientId) {
+    if (!token) {
       setPatientProfile(null);
-      setErrorMessage("Sessao sem ID de paciente.");
+      setErrorMessage("Sessao nao autenticada para carregar o paciente.");
       return;
     }
 
@@ -42,7 +42,7 @@ export function usePatientProfile(
     setErrorMessage("");
 
     try {
-      const profile = await fetchPatientProfileById(patientId);
+      const profile = await fetchCurrentPatientProfile();
       setPatientProfile(profile);
     } catch (error) {
       setPatientProfile(null);
@@ -54,7 +54,7 @@ export function usePatientProfile(
     } finally {
       setIsLoading(false);
     }
-  }, [enabled, patientId]);
+  }, [enabled, token]);
 
   useEffect(() => {
     void refreshPatientProfile();

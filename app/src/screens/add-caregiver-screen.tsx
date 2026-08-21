@@ -18,12 +18,13 @@ import { FormInput } from "../features/register/components/form-input";
 import { buildRegisterPayload } from "../features/register/payload";
 import { useRegistrationStore } from "../features/register/store/use-registration-store";
 import type { RegistrationFormValues, UserType } from "../features/register/types";
-import { registerUser } from "../services/registration-service";
+import { registerCaregiverAndCreateLink } from "../services/registration-service";
 
 type FeedbackState = "idle" | "success" | "error";
 
 const caregiverFormFields: Array<keyof RegistrationFormValues> = [
   "email",
+  "senha",
   "pacienteCpf",
   "pacienteNomeCompleto",
   "cuidadorNomeCompleto",
@@ -103,6 +104,24 @@ export default function AddCaregiverScreen({ onNavigateBack }: AddCaregiverScree
       isValid = false;
     }
 
+    if (values.senha.length < 8) {
+      setError("senha", {
+        type: "manual",
+        message: "A senha deve ter no minimo 8 caracteres.",
+      });
+      isValid = false;
+    } else if (
+      !/[A-Z]/.test(values.senha) ||
+      !/[a-z]/.test(values.senha) ||
+      !/[0-9]/.test(values.senha)
+    ) {
+      setError("senha", {
+        type: "manual",
+        message: "Use letras maiusculas, minusculas e ao menos 1 numero.",
+      });
+      isValid = false;
+    }
+
     if (cpfDigits.length !== 11) {
       setError("pacienteCpf", {
         type: "manual",
@@ -166,21 +185,21 @@ export default function AddCaregiverScreen({ onNavigateBack }: AddCaregiverScree
       {
         ...values,
         tipoUsuario: userType,
-        senha: "",
         pacienteCpf: values.pacienteCpf.replace(/\D/g, ""),
       },
       userType
     );
 
     try {
-      await registerUser(payload);
+      await registerCaregiverAndCreateLink(payload);
 
       setFeedbackState("success");
       setFeedbackMessage(
-        "Cuidador cadastrado com sucesso. A senha sera gerada e enviada para o e-mail informado."
+        "Cuidador cadastrado e vinculo solicitado. Compartilhe a senha temporaria com o cuidador."
       );
 
       setValue("email", "", { shouldDirty: false, shouldValidate: false });
+      setValue("senha", "", { shouldDirty: false, shouldValidate: false });
       setValue("cuidadorNomeCompleto", "", { shouldDirty: false, shouldValidate: false });
       setValue("cuidadorTelefone", "", { shouldDirty: false, shouldValidate: false });
       setValue("cuidadorRelacao", "", { shouldDirty: false, shouldValidate: false });
@@ -231,6 +250,15 @@ export default function AddCaregiverScreen({ onNavigateBack }: AddCaregiverScree
               label="E-mail do cuidador"
               placeholder="cuidador@email.com"
               keyboardType="email-address"
+              autoCapitalize="none"
+            />
+
+            <FormInput
+              control={control}
+              name="senha"
+              label="Senha temporaria do cuidador"
+              placeholder="Minimo de 8 caracteres"
+              isPassword
               autoCapitalize="none"
             />
 

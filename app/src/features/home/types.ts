@@ -12,7 +12,7 @@ export type GeneralMissionResponse = {
 
 export type MedicationMissionResponse = {
   id: string;
-  userId: string;
+  pacienteId: string;
   nomePaciente: string;
   nomeMedicamento: string;
   tipoMedicamento: string;
@@ -31,5 +31,4 @@ export type MyMissionsResponse = {
 export type CompleteMissionPayload = {
   missaoId?: string;
   prescricaoId?: string;
-  pacienteEmail: string;
 };

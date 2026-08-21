@@ -31,24 +31,29 @@ const normalizePatientProfileResponse = (data: unknown): PatientProfileResponse 
   }
 
   const parsedData = data as {
+    id?: unknown;
     dataTransplante?: unknown;
     moedas?: unknown;
     nivel?: unknown;
     nomeCompleto?: unknown;
     nomeCuidadores?: unknown;
+    cuidadores?: unknown;
     tipoTransplante?: unknown;
     xpAtual?: unknown;
   };
 
+  const id = asNonEmptyString(parsedData.id);
   const dataTransplante = asNonEmptyString(parsedData.dataTransplante);
   const nomeCompleto = asNonEmptyString(parsedData.nomeCompleto);
   const tipoTransplante = asNonEmptyString(parsedData.tipoTransplante);
   const moedas = asNonNegativeNumber(parsedData.moedas);
   const nivel = asNonNegativeNumber(parsedData.nivel);
   const xpAtual = asNonNegativeNumber(parsedData.xpAtual);
-  const nomeCuidadores = asStringArray(parsedData.nomeCuidadores);
+  const nomeCuidadores = asStringArray(
+    parsedData.cuidadores ?? parsedData.nomeCuidadores
+  );
 
-  if (!dataTransplante || !nomeCompleto || !tipoTransplante) {
+  if (!id || !dataTransplante || !nomeCompleto || !tipoTransplante) {
     throw new Error("Resposta de paciente invalida.");
   }
 
@@ -57,6 +62,7 @@ const normalizePatientProfileResponse = (data: unknown): PatientProfileResponse 
   }
 
   return {
+    id,
     dataTransplante,
     moedas,
     nivel,
@@ -67,15 +73,9 @@ const normalizePatientProfileResponse = (data: unknown): PatientProfileResponse 
   };
 };
 
-export const fetchPatientProfileById = async (
-  patientId: string
-): Promise<PatientProfileResponse> => {
-  if (!patientId.trim()) {
-    throw new Error("ID de paciente ausente.");
-  }
-
+export const fetchCurrentPatientProfile = async (): Promise<PatientProfileResponse> => {
   try {
-    const response = await api.get(`/pacientes/${patientId}`);
+    const response = await api.get("/pacientes/me");
     return normalizePatientProfileResponse(response.data);
   } catch (error) {
     if (axios.isAxiosError(error)) {
@@ -94,6 +94,44 @@ export const fetchPatientProfileById = async (
       }
 
       throw new Error(`Falha ao carregar perfil do paciente (HTTP ${status}).`);
+    }
+
+    throw error;
+  }
+};
+
+export const fetchCurrentPatientId = async (): Promise<string> => {
+  try {
+    const response = await api.get("/pacientes/me");
+
+    if (!response.data || typeof response.data !== "object") {
+      throw new Error("Resposta de paciente invalida.");
+    }
+
+    const patientId = asNonEmptyString((response.data as { id?: unknown }).id);
+
+    if (!patientId) {
+      throw new Error("Resposta de paciente invalida: id ausente.");
+    }
+
+    return patientId;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+
+      if (status === 404) {
+        throw new Error("Paciente da sessao nao encontrado.");
+      }
+
+      if (status === 401 || status === 403) {
+        throw new Error("Sessao sem permissao para acessar o paciente.");
+      }
+
+      if (!status) {
+        throw new Error("Nao foi possivel conectar com a API de pacientes.");
+      }
+
+      throw new Error(`Falha ao identificar o paciente (HTTP ${status}).`);
     }
 
     throw error;

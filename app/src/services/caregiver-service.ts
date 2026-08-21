@@ -23,22 +23,28 @@ const normalizeCaregiverProfileResponse = (data: unknown): CaregiverProfileRespo
   }
 
   const parsedData = data as {
+    id?: unknown;
     nomeCompleto?: unknown;
     nomePacientes?: unknown;
+    pacientes?: unknown;
     relacao?: unknown;
     telefone?: unknown;
   };
 
+  const id = asNonEmptyString(parsedData.id);
   const nomeCompleto = asNonEmptyString(parsedData.nomeCompleto);
-  const nomePacientes = asStringArray(parsedData.nomePacientes);
+  const nomePacientes = asStringArray(
+    parsedData.pacientes ?? parsedData.nomePacientes
+  );
   const relacao = asNonEmptyString(parsedData.relacao);
   const telefone = asNonEmptyString(parsedData.telefone);
 
-  if (!nomeCompleto || !relacao || !telefone) {
+  if (!id || !nomeCompleto || !relacao || !telefone) {
     throw new Error("Resposta de cuidador invalida.");
   }
 
   return {
+    id,
     nomeCompleto,
     nomePacientes,
     relacao,
@@ -46,30 +52,24 @@ const normalizeCaregiverProfileResponse = (data: unknown): CaregiverProfileRespo
   };
 };
 
-export const fetchCaregiverProfileById = async (
-  caregiverId: string
-): Promise<CaregiverProfileResponse> => {
-  if (!caregiverId.trim()) {
-    throw new Error("ID de cuidador ausente.");
-  }
-
+export const fetchCurrentCaregiverProfile = async (): Promise<CaregiverProfileResponse> => {
   try {
-    const response = await api.get(`/cuidadores/${caregiverId}`);
+    const response = await api.get("/cuidadores/me");
     return normalizeCaregiverProfileResponse(response.data);
   } catch (error) {
     if (axios.isAxiosError(error)) {
       const status = error.response?.status;
 
       if (status === 404) {
-        throw new Error("Cuidador nao encontrado.");
+        throw new Error("Cuidador não encontrado.");
       }
 
       if (status === 400) {
-        throw new Error("ID de cuidador invalido.");
+        throw new Error("ID de cuidador inválido.");
       }
 
       if (!status) {
-        throw new Error("Nao foi possivel conectar com a API de cuidadores.");
+        throw new Error("Não foi possível conectar com a API de cuidadores.");
       }
 
       throw new Error(`Falha ao carregar perfil do cuidador (HTTP ${status}).`);
