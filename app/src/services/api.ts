@@ -26,3 +26,27 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 
   return config;
 });
+
+/**
+ * Os GlobalExceptionHandler dos servicos respondem erros de negocio com o texto puro da
+ * excecao (ex.: 409 "Esta dose já foi registrada."). Devolve esse texto quando existir.
+ */
+export const extractApiErrorMessage = (data: unknown): string | null => {
+  if (typeof data === "string") {
+    const message = data.trim();
+    return message.length > 0 && message.length <= 240 && !message.startsWith("<")
+      ? message
+      : null;
+  }
+
+  if (data && typeof data === "object") {
+    const parsedData = data as { mensagem?: unknown; message?: unknown; erro?: unknown };
+    const candidate = parsedData.mensagem ?? parsedData.message ?? parsedData.erro;
+
+    return typeof candidate === "string" && candidate.trim().length > 0
+      ? candidate.trim()
+      : null;
+  }
+
+  return null;
+};

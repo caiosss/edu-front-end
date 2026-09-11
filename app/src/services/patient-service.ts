@@ -1,5 +1,9 @@
 import axios from "axios";
+import type { Nivel } from "../features/gamification/types";
+import { nivelFromLegacyProfile } from "../features/gamification/utils/level";
 import type { PatientProfileResponse } from "../features/profile/types";
+import { useAuthStore } from "../store/auth-store";
+import { getPacienteIdFromToken } from "../utils/jwt";
 import { api } from "./api";
 
 const asNonEmptyString = (value: unknown): string | null => {
@@ -25,6 +29,36 @@ const asStringArray = (value: unknown): string[] => {
     .filter((item) => item.length > 0);
 };
 
+/**
+ * Ha dois formatos de progresso em uso: o da SPEC-002 (`xpTotal`, `xpNoNivel`,
+ * `xpParaProximo`) e o anterior, com `xpAtual` residual do nivel. Aceita os dois.
+ */
+const resolveProfileProgress = (data: {
+  nivel?: unknown;
+  xpAtual?: unknown;
+  xpTotal?: unknown;
+  xpNoNivel?: unknown;
+  xpParaProximo?: unknown;
+}): { nivel: Nivel; xpTotal: number } | null => {
+  const nivel = asNonNegativeNumber(data.nivel);
+
+  if (nivel === null) {
+    return null;
+  }
+
+  const xpTotal = asNonNegativeNumber(data.xpTotal);
+  const xpNoNivel = asNonNegativeNumber(data.xpNoNivel);
+  const xpParaProximo = asNonNegativeNumber(data.xpParaProximo);
+
+  if (xpTotal !== null && xpNoNivel !== null && xpParaProximo !== null) {
+    return { nivel: { atual: Math.max(1, nivel), xpNoNivel, xpParaProximo }, xpTotal };
+  }
+
+  const xpAtual = asNonNegativeNumber(data.xpAtual);
+
+  return xpAtual === null ? null : nivelFromLegacyProfile(nivel, xpAtual);
+};
+
 const normalizePatientProfileResponse = (data: unknown): PatientProfileResponse => {
   if (!data || typeof data !== "object") {
     throw new Error("Resposta de paciente invalida.");
@@ -40,36 +74,38 @@ const normalizePatientProfileResponse = (data: unknown): PatientProfileResponse 
     cuidadores?: unknown;
     tipoTransplante?: unknown;
     xpAtual?: unknown;
+    xpTotal?: unknown;
+    xpNoNivel?: unknown;
+    xpParaProximo?: unknown;
   };
 
   const id = asNonEmptyString(parsedData.id);
-  const dataTransplante = asNonEmptyString(parsedData.dataTransplante);
   const nomeCompleto = asNonEmptyString(parsedData.nomeCompleto);
-  const tipoTransplante = asNonEmptyString(parsedData.tipoTransplante);
   const moedas = asNonNegativeNumber(parsedData.moedas);
-  const nivel = asNonNegativeNumber(parsedData.nivel);
-  const xpAtual = asNonNegativeNumber(parsedData.xpAtual);
+  const progress = resolveProfileProgress(parsedData);
   const nomeCuidadores = asStringArray(
     parsedData.cuidadores ?? parsedData.nomeCuidadores
   );
 
-  if (!id || !dataTransplante || !nomeCompleto || !tipoTransplante) {
+  if (!id || !nomeCompleto) {
     throw new Error("Resposta de paciente invalida.");
   }
 
-  if (moedas === null || nivel === null || xpAtual === null) {
-    throw new Error("Resposta de paciente invalida.");
+  if (!progress) {
+    throw new Error("Resposta de paciente invalida: progresso ausente.");
   }
 
   return {
     id,
-    dataTransplante,
-    moedas,
-    nivel,
+    dataTransplante: asNonEmptyString(parsedData.dataTransplante) ?? "",
+    moedas: moedas ?? 0,
+    nivel: progress.nivel.atual,
     nomeCompleto,
     nomeCuidadores,
-    tipoTransplante,
-    xpAtual,
+    tipoTransplante: asNonEmptyString(parsedData.tipoTransplante) ?? "",
+    xpTotal: progress.xpTotal,
+    xpNoNivel: progress.nivel.xpNoNivel,
+    xpParaProximo: progress.nivel.xpParaProximo,
   };
 };
 
@@ -136,4 +172,31 @@ export const fetchCurrentPatientId = async (): Promise<string> => {
 
     throw error;
   }
+};
+
+let cachedPatientId: { token: string; pacienteId: string } | null = null;
+
+/**
+ * Id do paciente da sessao. O token so traz a claim `pacienteId` a partir da SPEC-003; com a
+ * API anterior, o id vem de `/pacientes/me` e fica guardado enquanto o token for o mesmo.
+ */
+export const resolveCurrentPatientId = async (): Promise<string> => {
+  const token = useAuthStore.getState().token;
+  const pacienteIdFromToken = getPacienteIdFromToken(token);
+
+  if (pacienteIdFromToken) {
+    return pacienteIdFromToken;
+  }
+
+  if (token && cachedPatientId?.token === token) {
+    return cachedPatientId.pacienteId;
+  }
+
+  const pacienteId = await fetchCurrentPatientId();
+
+  if (token) {
+    cachedPatientId = { token, pacienteId };
+  }
+
+  return pacienteId;
 };

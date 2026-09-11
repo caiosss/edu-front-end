@@ -6,16 +6,18 @@ import {
   StyleSheet,
   Text,
   View,
-  type LayoutChangeEvent,
 } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { Bell, Eye, Heart, LogOut, Medal, Settings, UserRound } from "lucide-react-native";
+import { Bell, Eye, Gem, Heart, LogOut, Medal, Settings, UserRound } from "lucide-react-native";
+import { AnimatedXpBar } from "../features/gamification/components/animated-xp-bar";
+import { LevelRing } from "../features/gamification/components/level-ring";
+import type { Nivel } from "../features/gamification/types";
+import { isNivelAtOrAhead, nivelRatio } from "../features/gamification/utils/level";
 import SettingItem from "../features/navigation/components/settings-item";
 import { useAuth } from "../hooks/useAuth";
 import { useCaregiverProfile } from "../hooks/use-caregiver-profile";
 import { usePatientProfile } from "../hooks/use-patient-profile";
-
-const XP_PER_LEVEL = 1000;
+import { useGamificationStore } from "../store/gamification-store";
 
 const parseDate = (value: string): Date | null => {
   const parsedDate = new Date(value);
@@ -79,7 +81,8 @@ export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScree
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [accessibilityEnabled, setAccessibilityEnabled] = useState(false);
-  const [progressTrackWidth, setProgressTrackWidth] = useState(0);
+  const storeNivel = useGamificationStore((state) => state.nivel);
+  const storeXpTotal = useGamificationStore((state) => state.xpTotal);
 
   const isProfileLoading = isCaregiverUser ? isCaregiverLoading : isPatientLoading;
   const profileErrorMessage = isCaregiverUser ? caregiverErrorMessage : patientErrorMessage;
@@ -91,15 +94,26 @@ export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScree
     ? refreshCaregiverProfile
     : refreshPatientProfile;
 
-  const currentXp = patientProfile?.xpAtual ?? 0;
   const caregiverNames = patientProfile?.nomeCuidadores ?? [];
   const patientNames = caregiverProfile?.nomePacientes ?? [];
-  const xpProgressRatio = Math.max(0, Math.min((currentXp % XP_PER_LEVEL) / XP_PER_LEVEL, 1));
-  const xpProgressWidth = progressTrackWidth * xpProgressRatio;
 
-  const handleProgressTrackLayout = (event: LayoutChangeEvent) => {
-    setProgressTrackWidth(event.nativeEvent.layout.width);
-  };
+  // A conclusao atualiza o nivel antes de o perfil refletir o XP (evento assincrono): usa o
+  // mais adiantado dos dois.
+  const patientNivel = useMemo<Nivel | null>(() => {
+    if (!patientProfile) {
+      return null;
+    }
+
+    const profileNivel: Nivel = {
+      atual: patientProfile.nivel,
+      xpNoNivel: patientProfile.xpNoNivel,
+      xpParaProximo: patientProfile.xpParaProximo,
+    };
+
+    return storeNivel && isNivelAtOrAhead(storeNivel, profileNivel) ? storeNivel : profileNivel;
+  }, [patientProfile, storeNivel]);
+
+  const patientXpTotal = Math.max(patientProfile?.xpTotal ?? 0, storeXpTotal ?? 0);
 
   const accessibilityDescription = useMemo(
     () =>
@@ -180,7 +194,7 @@ export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScree
             <View style={styles.metaGroup}>
               <ProfileInfoRow
                 label="Tipo do transplante"
-                value={patientProfile.tipoTransplante}
+                value={patientProfile.tipoTransplante || "Nao informado"}
               />
               <ProfileInfoRow
                 label="Data do transplante"
@@ -195,16 +209,32 @@ export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScree
                 <Medal size={18} color="#2C7BE5" />
                 <Text style={styles.cardTitle}>Conquistas e progresso</Text>
               </View>
-              <Text style={styles.levelBadge}>
-                Nivel {Math.max(1, Math.round(patientProfile.nivel))}
-              </Text>
+              <Text style={styles.levelBadge}>Nível {patientNivel?.atual ?? 1}</Text>
             </View>
 
-            <View style={styles.progressTrack} onLayout={handleProgressTrackLayout}>
-              <View style={[styles.progressFill, { width: xpProgressWidth }]} />
+            <View style={styles.progressRow}>
+              <LevelRing nivel={patientNivel} size={60} strokeWidth={6} delay={200} />
+              <View style={styles.progressInfo}>
+                <AnimatedXpBar
+                  ratio={nivelRatio(patientNivel)}
+                  levelKey={patientNivel?.atual}
+                  delay={260}
+                />
+                <Text style={styles.supportingText}>
+                  {patientXpTotal} XP no total
+                  {patientNivel
+                    ? ` · faltam ${patientNivel.xpParaProximo} XP para o nível ${
+                        patientNivel.atual + 1
+                      }`
+                    : ""}
+                </Text>
+              </View>
             </View>
-            <Text style={styles.supportingText}>Você tem {patientProfile.xpAtual} de pontos de experiência!</Text>
-            {/* Moedas devem ser exibidas neste card quando o layout de moedas for adicionado. */}
+
+            <View style={styles.coinChip}>
+              <Gem size={14} color="#845EF7" />
+              <Text style={styles.coinText}>{patientProfile.moedas} moedas</Text>
+            </View>
           </Animated.View>
 
           {caregiverNames.length > 0 ? (
@@ -378,17 +408,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  progressTrack: {
-    width: "100%",
-    height: 12,
-    borderRadius: 999,
-    backgroundColor: "#DFEAF5",
-    overflow: "hidden",
+  progressRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
   },
-  progressFill: {
-    height: "100%",
+  progressInfo: {
+    flex: 1,
+    gap: 6,
+  },
+  coinChip: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     borderRadius: 999,
-    backgroundColor: "#2C7BE5",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: "#F3F0FF",
+  },
+  coinText: {
+    color: "#5F3DC4",
+    fontSize: 12,
+    fontWeight: "700",
   },
   supportingText: {
     color: "#35506B",

@@ -1,25 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  type LayoutChangeEvent,
-} from "react-native";
-import Animated, { FadeInDown, LinearTransition } from "react-native-reanimated";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
+import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import {
   Bell,
   CircleStar,
   GlassWater,
   Pill,
+  Sparkles,
   Star,
   type LucideIcon,
 } from "lucide-react-native";
+import { AnimatedXpBar } from "../features/gamification/components/animated-xp-bar";
+import { LevelRing } from "../features/gamification/components/level-ring";
+import type { ConclusaoResponse, ProgressoDoDia } from "../features/gamification/types";
+import { nivelRatio } from "../features/gamification/utils/level";
 import type {
   GeneralMissionResponse,
   MedicationMissionResponse,
 } from "../features/home/types";
-import { MissionCompletionFeedback } from "../features/home/components/mission-completion-feedback";
 import {
   formatMedicationTimeLabel,
   getMedicationScheduleInfo,
@@ -30,7 +28,11 @@ import ChecklistCard, {
 } from "../features/navigation/components/check-list-card";
 import { useAuth } from "../hooks/useAuth";
 import { useCompleteMission } from "../hooks/use-complete-mission";
+import { syncAchievementsAfterReward, useGamification } from "../hooks/use-gamification";
 import { useHomeMissions } from "../hooks/use-home-missions";
+import { useGamificationStore } from "../store/gamification-store";
+
+const DAILY_PROGRESS_GRADIENT = ["#63E6BE", "#20C997", "#2C7BE5"] as const;
 
 const resolveMissionIcon = (categoria: string): LucideIcon => {
   const normalizedCategory = categoria.trim().toUpperCase();
@@ -106,35 +108,37 @@ const mapMedicationMissionToChecklistItem = (
 
 export default function HomeScreen() {
   const { role } = useAuth();
-  const { missions, isLoading, errorMessage } = useHomeMissions();
+  const { missions, isLoading, errorMessage, refreshHomeMissions } = useHomeMissions();
   const {
     completeMission,
     completingMissionKeys,
     errorMessage: completeMissionErrorMessage,
   } = useCompleteMission();
+  const { isPatient, nivel, xpTotal } = useGamification();
+  const applyConclusao = useGamificationStore((state) => state.applyConclusao);
 
   const [takenMedicationIds, setTakenMedicationIds] = useState<string[]>([]);
   const [completedMissionIds, setCompletedMissionIds] = useState<string[]>([]);
-  const [completionFeedback, setCompletionFeedback] = useState<{
-    id: number;
-    message: string;
-  } | null>(null);
+  const [doseProgress, setDoseProgress] = useState<ProgressoDoDia | null>(null);
   const [completionErrorSection, setCompletionErrorSection] = useState<
     "medication" | "mission" | null
   >(null);
-  const [progressTrackWidth, setProgressTrackWidth] = useState(0);
   const [currentDate, setCurrentDate] = useState(() => new Date());
 
-  const hideCompletionFeedback = useCallback(() => {
-    setCompletionFeedback(null);
-  }, []);
+  const handleConclusao = useCallback(
+    (conclusao: ConclusaoResponse) => {
+      applyConclusao(conclusao);
 
-  const showCompletionFeedback = useCallback((message: string) => {
-    setCompletionFeedback({
-      id: Date.now(),
-      message,
-    });
-  }, []);
+      if (conclusao.registro?.progressoDoDia) {
+        setDoseProgress(conclusao.registro.progressoDoDia);
+      }
+
+      // O estado `concluido` e derivado no backend; a conquista destrava de forma assincrona.
+      void refreshHomeMissions();
+      syncAchievementsAfterReward();
+    },
+    [applyConclusao, refreshHomeMissions]
+  );
 
   useEffect(() => {
     const intervalId = setInterval(() => {
@@ -216,11 +220,7 @@ export default function HomeScreen() {
     const completingMissionKeySet = new Set(completingMissionKeys);
 
     return missions.missoesGerais
-      .filter(
-        (mission) =>
-          completingMissionKeySet.has(mission.id) ||
-          completingMissionKeySet.has(mission.missaoId)
-      )
+      .filter((mission) => completingMissionKeySet.has(mission.id))
       .map((mission) => mission.id);
   }, [completingMissionKeys, missions]);
 
@@ -328,16 +328,16 @@ export default function HomeScreen() {
 
     setCompletionErrorSection(null);
 
-    const completionMessage = await completeMission({
-      prescricaoId: medicationMission.id,
+    const conclusao = await completeMission({
+      prescricaoItemId: medicationMission.id,
     });
 
-    if (completionMessage) {
+    if (conclusao) {
       setTakenMedicationIds((currentIds) =>
         currentIds.includes(itemId) ? currentIds : [...currentIds, itemId]
       );
       setCompletionErrorSection(null);
-      showCompletionFeedback(completionMessage);
+      handleConclusao(conclusao);
     } else {
       setCompletionErrorSection("medication");
     }
@@ -361,30 +361,31 @@ export default function HomeScreen() {
 
     setCompletionErrorSection(null);
 
-    const completionMessage = await completeMission({
-      missaoId: mission.missaoId,
+    const conclusao = await completeMission({
+      planoMissaoItemId: mission.id,
     });
 
-    if (completionMessage) {
+    if (conclusao) {
       setCompletedMissionIds((currentIds) =>
         currentIds.includes(itemId) ? currentIds : [...currentIds, itemId]
       );
       setCompletionErrorSection(null);
-      showCompletionFeedback(completionMessage);
+      handleConclusao(conclusao);
     } else {
       setCompletionErrorSection("mission");
     }
   };
 
-  const weeklyCompletedDays = useMemo(() => {
-    const totalActivities = medicationItems.length + dailyMissionItems.length;
-    const completedActivities = takenMedicationIds.length + completedMissionIds.length;
+  const dailyProgress = useMemo(() => {
+    const total = medicationItems.length + dailyMissionItems.length;
+    const done = Math.min(takenMedicationIds.length + completedMissionIds.length, total);
 
-    if (completedActivities === 0 || totalActivities === 0) {
-      return 0;
-    }
-
-    return Math.max(1, Math.round((completedActivities / totalActivities) * 7));
+    return {
+      total,
+      done,
+      ratio: total > 0 ? done / total : 0,
+      isComplete: total > 0 && done >= total,
+    };
   }, [
     completedMissionIds.length,
     dailyMissionItems.length,
@@ -392,8 +393,6 @@ export default function HomeScreen() {
     takenMedicationIds.length,
   ]);
 
-  const weeklyProgressRatio = weeklyCompletedDays / 7;
-  const weeklyProgressWidth = progressTrackWidth * weeklyProgressRatio;
   const welcomeName = role === "Paciente" ? "Paciente" : "Cuidador";
 
   const medicationDescription = useMemo(() => {
@@ -441,7 +440,7 @@ export default function HomeScreen() {
       return "Carregando suas recomendações do dia...";
     }
 
-    return "Complete suas recomendações para ganhar pontos e evoluir.";
+    return "Complete suas recomendações para ganhar XP e evoluir de nível.";
   }, [
     completeMissionErrorMessage,
     completionErrorSection,
@@ -449,10 +448,6 @@ export default function HomeScreen() {
     isLoading,
     missions,
   ]);
-
-  const handleProgressTrackLayout = (event: LayoutChangeEvent) => {
-    setProgressTrackWidth(event.nativeEvent.layout.width);
-  };
 
   return (
     <View style={styles.container}>
@@ -468,6 +463,31 @@ export default function HomeScreen() {
           </View>
         </View>
         <Text style={styles.subtitle}>Vamos comecar seu plano de autocuidado de hoje?</Text>
+
+        {isPatient ? (
+          <Animated.View entering={FadeIn.delay(160).duration(260)} style={styles.levelStrip}>
+            <LevelRing nivel={nivel} size={58} strokeWidth={6} delay={200} />
+            <View style={styles.levelInfo}>
+              <View style={styles.levelHeader}>
+                <Text style={styles.levelTitle}>
+                  {nivel ? `Nível ${nivel.atual}` : "Seu nível"}
+                </Text>
+                {xpTotal !== null ? <Text style={styles.levelXp}>{xpTotal} XP</Text> : null}
+              </View>
+              <AnimatedXpBar
+                ratio={nivelRatio(nivel)}
+                levelKey={nivel?.atual}
+                height={10}
+                delay={260}
+              />
+              <Text style={styles.levelHint}>
+                {nivel
+                  ? `Faltam ${nivel.xpParaProximo} XP para o nível ${nivel.atual + 1}`
+                  : "Carregando seu progresso..."}
+              </Text>
+            </View>
+          </Animated.View>
+        ) : null}
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(60).duration(230)}>
@@ -494,29 +514,25 @@ export default function HomeScreen() {
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(180).duration(250)} style={styles.card}>
-        <Text style={styles.h2}>Progresso semanal</Text>
+        <View style={styles.progressHeader}>
+          <Text style={styles.h2}>Progresso de hoje</Text>
+          {dailyProgress.isComplete ? <Sparkles size={20} color="#F5B942" /> : null}
+        </View>
         <Text style={styles.info}>
-          Voce completou {weeklyCompletedDays} de 7 dias de autocuidado esta semana.
+          {dailyProgress.isComplete
+            ? "Tudo concluído por hoje. Excelente cuidado!"
+            : `Você concluiu ${dailyProgress.done} de ${dailyProgress.total} atividades hoje.`}
         </Text>
 
-        <View style={styles.progressRow}>
-          <View onLayout={handleProgressTrackLayout} style={styles.progressTrack}>
-            <Animated.View
-              layout={LinearTransition.duration(280)}
-              style={[styles.progressFill, { width: weeklyProgressWidth }]}
-            />
-          </View>
-          <CircleStar size={18} color="#2C7BE5" />
-        </View>
+        <AnimatedXpBar ratio={dailyProgress.ratio} colors={DAILY_PROGRESS_GRADIENT} height={12} />
+
+        {doseProgress ? (
+          <Text style={styles.progressHint}>
+            Doses registradas hoje: {doseProgress.registradas} de {doseProgress.previstas}
+          </Text>
+        ) : null}
       </Animated.View>
       </ScrollView>
-
-      <MissionCompletionFeedback
-        animationKey={completionFeedback?.id ?? 0}
-        message={completionFeedback?.message ?? ""}
-        visible={Boolean(completionFeedback)}
-        onHide={hideCompletionFeedback}
-      />
     </View>
   );
 }
@@ -566,6 +582,38 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "#E8F2FF",
   },
+  levelStrip: {
+    marginTop: 6,
+    borderRadius: 14,
+    padding: 12,
+    backgroundColor: "#F1F7FE",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  levelInfo: {
+    flex: 1,
+    gap: 5,
+  },
+  levelHeader: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+  },
+  levelTitle: {
+    color: "#12314C",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  levelXp: {
+    color: "#1A6FD6",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  levelHint: {
+    color: "#5B738A",
+    fontSize: 12,
+  },
   card: {
     borderRadius: 18,
     padding: 16,
@@ -587,22 +635,14 @@ const styles = StyleSheet.create({
     color: "#35506B",
     lineHeight: 20,
   },
-  progressRow: {
-    marginTop: 2,
+  progressHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    justifyContent: "space-between",
   },
-  progressTrack: {
-    flex: 1,
-    height: 12,
-    borderRadius: 999,
-    backgroundColor: "#DFEAF5",
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    borderRadius: 999,
-    backgroundColor: "#2C7BE5",
+  progressHint: {
+    color: "#5B738A",
+    fontSize: 12,
+    fontWeight: "600",
   },
 });

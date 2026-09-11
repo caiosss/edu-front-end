@@ -1,51 +1,6 @@
 import { useMemo } from "react";
 import { useAuthStore } from "../store/auth-store";
-
-type JwtPayload = {
-  role?: string;
-  roles?: string[];
-  sub?: string;
-  email?: string;
-  preferred_username?: string;
-  username?: string;
-  nome?: string;
-  name?: string;
-  [key: string]: unknown;
-};
-
-const decodeBase64Url = (value: string): string => {
-  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
-
-  if (typeof globalThis.atob !== "function") {
-    throw new Error("No base64 decoder available in this environment.");
-  }
-
-  const decoded = globalThis.atob(padded);
-  const encoded = Array.from(decoded)
-    .map((char) => `%${char.charCodeAt(0).toString(16).padStart(2, "0")}`)
-    .join("");
-
-  return decodeURIComponent(encoded);
-};
-
-const decodeTokenPayload = (token: string | null): JwtPayload | null => {
-  if (!token) {
-    return null;
-  }
-
-  const tokenParts = token.split(".");
-
-  if (tokenParts.length < 2) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(decodeBase64Url(tokenParts[1])) as JwtPayload;
-  } catch {
-    return null;
-  }
-};
+import { decodeTokenPayload, type JwtPayload } from "../utils/jwt";
 
 const asNonEmptyString = (value: unknown): string | null => {
   return typeof value === "string" && value.trim().length > 0 ? value : null;

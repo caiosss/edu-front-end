@@ -1,9 +1,21 @@
 import { useCallback, useRef, useState } from "react";
-import { completeMission as completeMissionRequest } from "../services/missions-service";
+import type { ConclusaoResponse } from "../features/gamification/types";
+import type { CompleteMissionPayload } from "../features/home/types";
+import {
+  CompleteMissionNetworkError,
+  completeMission as completeMissionRequest,
+} from "../services/missions-service";
+import { createIdempotencyKey } from "../utils/idempotency-key";
 
-type CompleteMissionInput = {
-  missaoId?: string;
-  prescricaoId?: string;
+/**
+ * Janela em que uma nova tentativa reaproveita a mesma `Idempotency-Key`. Depois dela, o toque
+ * e tratado como acao nova — senao a dose seguinte do mesmo item receberia a resposta antiga.
+ */
+const RETRY_KEY_TTL_MS = 10 * 60 * 1000;
+
+type PendingIdempotencyKey = {
+  key: string;
+  createdAt: number;
 };
 
 type UseCompleteMissionResult = {
@@ -11,11 +23,12 @@ type UseCompleteMissionResult = {
   errorMessage: string;
   isCompleting: boolean;
   clearCompleteMissionError: () => void;
-  completeMission: (input: CompleteMissionInput) => Promise<string | null>;
+  completeMission: (input: CompleteMissionPayload) => Promise<ConclusaoResponse | null>;
 };
 
 export function useCompleteMission(): UseCompleteMissionResult {
   const completingMissionKeysRef = useRef<Set<string>>(new Set());
+  const idempotencyKeysRef = useRef<Map<string, PendingIdempotencyKey>>(new Map());
 
   const [completingMissionKeys, setCompletingMissionKeys] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
@@ -33,18 +46,30 @@ export function useCompleteMission(): UseCompleteMissionResult {
     setCompletingMissionKeys(Array.from(nextCompletingMissionKeys));
   }, []);
 
+  const resolveIdempotencyKey = useCallback((missionKey: string) => {
+    const pending = idempotencyKeysRef.current.get(missionKey);
+
+    if (pending && Date.now() - pending.createdAt < RETRY_KEY_TTL_MS) {
+      return pending.key;
+    }
+
+    const key = createIdempotencyKey();
+    idempotencyKeysRef.current.set(missionKey, { key, createdAt: Date.now() });
+    return key;
+  }, []);
+
   const clearCompleteMissionError = useCallback(() => {
     setErrorMessage("");
   }, []);
 
   const completeMission = useCallback(
-    async (input: CompleteMissionInput) => {
-      const normalizedMissionId = input.missaoId?.trim();
-      const normalizedPrescriptionId = input.prescricaoId?.trim();
-      const missionKey = normalizedPrescriptionId || normalizedMissionId;
+    async (input: CompleteMissionPayload) => {
+      const planoMissaoItemId = input.planoMissaoItemId?.trim();
+      const prescricaoItemId = input.prescricaoItemId?.trim();
+      const missionKey = prescricaoItemId || planoMissaoItemId;
 
       if (!missionKey) {
-        setErrorMessage("ID da missao ou prescricao ausente.");
+        setErrorMessage("ID do item do plano ou da prescricao ausente.");
         return null;
       }
 
@@ -56,11 +81,19 @@ export function useCompleteMission(): UseCompleteMissionResult {
       setErrorMessage("");
 
       try {
-        return await completeMissionRequest({
-          missaoId: normalizedMissionId,
-          prescricaoId: normalizedPrescriptionId,
-        });
+        const conclusao = await completeMissionRequest(
+          { planoMissaoItemId, prescricaoItemId },
+          resolveIdempotencyKey(missionKey)
+        );
+        idempotencyKeysRef.current.delete(missionKey);
+        return conclusao;
       } catch (error) {
+        // Sem resposta nao da para saber se o backend registrou: a proxima tentativa reenvia a
+        // mesma chave e recebe a resposta original, sem duplicar XP (SPEC-001 §5.3).
+        if (!(error instanceof CompleteMissionNetworkError)) {
+          idempotencyKeysRef.current.delete(missionKey);
+        }
+
         setErrorMessage(
           error instanceof Error ? error.message : "Nao foi possivel concluir a missao."
         );
@@ -69,7 +102,7 @@ export function useCompleteMission(): UseCompleteMissionResult {
         setMissionCompleting(missionKey, false);
       }
     },
-    [setMissionCompleting]
+    [resolveIdempotencyKey, setMissionCompleting]
   );
 
   return {

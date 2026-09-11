@@ -1,3 +1,7 @@
+/**
+ * `PacienteResponseDTO`. O progresso e derivado de `xpTotal` no backend: `nivel`,
+ * `xpNoNivel` e `xpParaProximo` sao calculados, nunca lidos de coluna mutavel.
+ */
 export type PatientProfileResponse = {
   id: string;
   dataTransplante: string;
@@ -5,7 +9,9 @@ export type PatientProfileResponse = {
   nivel: number;
   nomeCompleto: string;
   tipoTransplante: string;
-  xpAtual: number;
+  xpTotal: number;
+  xpNoNivel: number;
+  xpParaProximo: number;
   nomeCuidadores: string[];
 };
 

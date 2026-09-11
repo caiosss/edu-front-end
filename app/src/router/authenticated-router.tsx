@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
+import { CelebrationHost } from "../features/gamification/components/celebration-host";
 import { AuthToolbar } from "../features/navigation/components/auth-toolbar";
 import AddCaregiverScreen from "../screens/add-caregiver-screen";
 import ProfileScreen from "../screens/profile-screen";
@@ -48,30 +49,39 @@ export function AuthenticatedRouter() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top", "right", "left", "bottom"]}>
-      <View style={styles.contentArea}>
-        <Animated.View
-          key={contentKey}
-          entering={FadeIn.duration(190)}
-          exiting={FadeOut.duration(140)}
-          style={styles.screenContainer}
-        >
-          {renderContent()}
-        </Animated.View>
-      </View>
+    <View style={styles.root}>
+      <SafeAreaView style={styles.safeArea} edges={["top", "right", "left", "bottom"]}>
+        <View style={styles.contentArea}>
+          <Animated.View
+            key={contentKey}
+            entering={FadeIn.duration(190)}
+            exiting={FadeOut.duration(140)}
+            style={styles.screenContainer}
+          >
+            {renderContent()}
+          </Animated.View>
+        </View>
 
-      {!isOverlayVisible ? (
-        <AuthToolbar
-          routes={authenticatedRoutes}
-          currentRouteKey={activeRoute.key}
-          onSelectRoute={setCurrentRouteKey}
-        />
-      ) : null}
-    </SafeAreaView>
+        {!isOverlayVisible ? (
+          <AuthToolbar
+            routes={authenticatedRoutes}
+            currentRouteKey={activeRoute.key}
+            onSelectRoute={setCurrentRouteKey}
+          />
+        ) : null}
+      </SafeAreaView>
+
+      {/* Fora da SafeAreaView para os modais cobrirem a tela inteira, inclusive a toolbar. */}
+      <CelebrationHost />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: "#EAF2FA",
+  },
   safeArea: {
     flex: 1,
     backgroundColor: "#EAF2FA",

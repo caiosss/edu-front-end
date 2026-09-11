@@ -1,23 +1,18 @@
-import { useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  type LayoutChangeEvent,
-} from "react-native";
-import Animated, { FadeInDown, LinearTransition } from "react-native-reanimated";
+import { useEffect } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import Animated, {
+  Easing,
+  LinearTransition,
+  ZoomIn,
+  cancelAnimation,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import {
   AlertTriangle,
-  Bell,
   Circle,
   CircleCheck,
-  CircleStar,
-  GlassWater,
-  Pill,
-  Star,
   type LucideIcon,
 } from "lucide-react-native";
 
@@ -34,50 +29,6 @@ export type ChecklistItemNotice = {
   message: string;
   tone: "danger" | "info";
 };
-
-export const medications: ChecklistItem[] = [
-  {
-    id: "tacrolimo",
-    title: "Tacrolimo",
-    subtitle: "1 mg - 08:00",
-    icon: Pill,
-  },
-  {
-    id: "prednisona",
-    title: "Prednisona",
-    subtitle: "5 mg - 12:00",
-    icon: Pill,
-  },
-  {
-    id: "micofenolato",
-    title: "Micofenolato",
-    subtitle: "500 mg - 20:00",
-    icon: Pill,
-  },
-];
-
-export const dailyMissions: ChecklistItem[] = [
-  {
-    id: "tomar-medicamentos",
-    title: "Tomar todos os medicamentos",
-    icon: Pill,
-  },
-  {
-    id: "hidratar",
-    title: "Beber 2L de agua",
-    icon: GlassWater,
-  },
-  {
-    id: "caminhada",
-    title: "Realizar uma leve caminhada",
-    icon: Star,
-  },
-  {
-    id: "sintomas",
-    title: "Registrar sintomas",
-    icon: CircleStar,
-  },
-];
 
 type ChecklistCardProps = {
   title: string;
@@ -100,6 +51,26 @@ function ChecklistNotice({ notice }: { notice: ChecklistItemNotice }) {
       </Text>
     </View>
   );
+}
+
+/** Onda que se expande a partir do icone quando o item e marcado. */
+function CheckRipple() {
+  const progress = useSharedValue(0);
+
+  useEffect(() => {
+    progress.value = withTiming(1, { duration: 700, easing: Easing.out(Easing.cubic) });
+
+    return () => {
+      cancelAnimation(progress);
+    };
+  }, [progress]);
+
+  const rippleStyle = useAnimatedStyle(() => ({
+    opacity: 0.6 * (1 - progress.value),
+    transform: [{ scale: 1 + progress.value * 1.4 }],
+  }));
+
+  return <Animated.View pointerEvents="none" style={[styles.checkRipple, rippleStyle]} />;
 }
 
 export default function ChecklistCard({
@@ -154,6 +125,7 @@ export default function ChecklistCard({
                       isChecked ? styles.iconBadgeChecked : null,
                     ]}
                   >
+                    {isChecked ? <CheckRipple /> : null}
                     <ItemIcon size={15} color={iconColor} />
                   </View>
                   <View style={styles.checklistTextBlock}>
@@ -169,7 +141,9 @@ export default function ChecklistCard({
                   {isLoading ? (
                     <ActivityIndicator size="small" color="#1A6FD6" />
                   ) : isChecked ? (
-                    <CircleCheck size={18} color="#1A6FD6" />
+                    <Animated.View entering={ZoomIn.springify().damping(7)}>
+                      <CircleCheck size={18} color="#1A6FD6" />
+                    </Animated.View>
                   ) : isDanger ? (
                     <Circle size={18} color="#C92A2A" />
                   ) : (
@@ -299,6 +273,14 @@ const styles = StyleSheet.create({
   },
   iconBadgeChecked: {
     backgroundColor: "#CEE4FF",
+  },
+  checkRipple: {
+    position: "absolute",
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 2,
+    borderColor: "#4DABF7",
   },
   iconBadgeDanger: {
     backgroundColor: "#FFE3E3",
