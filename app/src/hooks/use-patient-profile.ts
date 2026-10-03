@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { PatientProfileResponse } from "../features/profile/types";
 import { useAuthStore } from "../store/auth-store";
-import { useGamificationStore } from "../store/gamification-store";
 import { fetchCurrentPatientProfile } from "../services/patient-service";
 
 type UsePatientProfileOptions = {
@@ -45,7 +44,6 @@ export function usePatientProfile(
     try {
       const profile = await fetchCurrentPatientProfile();
       setPatientProfile(profile);
-      useGamificationStore.getState().hydrateFromProfile(profile);
     } catch (error) {
       setPatientProfile(null);
       setErrorMessage(

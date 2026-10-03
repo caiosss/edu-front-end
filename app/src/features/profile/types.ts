@@ -1,17 +1,9 @@
-/**
- * `PacienteResponseDTO`. O progresso e derivado de `xpTotal` no backend: `nivel`,
- * `xpNoNivel` e `xpParaProximo` sao calculados, nunca lidos de coluna mutavel.
- */
+/** `PacienteResponseDTO`, sem os campos de progresso: eles vem de `/gamification/perfil`. */
 export type PatientProfileResponse = {
   id: string;
   dataTransplante: string;
-  moedas: number;
-  nivel: number;
   nomeCompleto: string;
   tipoTransplante: string;
-  xpTotal: number;
-  xpNoNivel: number;
-  xpParaProximo: number;
   nomeCuidadores: string[];
 };
 

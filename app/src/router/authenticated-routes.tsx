@@ -1,17 +1,17 @@
 import type { ComponentType } from "react";
 import {
+  Brain,
   House,
-  Store,
   Medal,
   UserRound,
   type LucideIcon,
 } from "lucide-react-native";
+import GamesScreen from "../screens/games-screen";
 import HomeScreen from "../screens/home-screen";
-import StoreScreen from "../screens/store-screen";
-import ProgressScreen from "../screens/progress-screen";
 import ProfileScreen from "../screens/profile-screen";
+import ProgressScreen from "../screens/progress-screen";
 
-export type AuthenticatedRouteKey = "inicio" | "loja" | "progresso" | "perfil";
+export type AuthenticatedRouteKey = "inicio" | "progresso" | "treino" | "perfil";
 
 export type AuthenticatedRoute = {
   key: AuthenticatedRouteKey;
@@ -32,6 +32,12 @@ export const authenticatedRoutes: AuthenticatedRoute[] = [
     label: "Progresso",
     icon: Medal,
     component: ProgressScreen,
+  },
+  {
+    key: "treino",
+    label: "Treinar",
+    icon: Brain,
+    component: GamesScreen,
   },
   {
     key: "perfil",

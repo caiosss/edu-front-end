@@ -15,10 +15,10 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { CalendarCheck, Star } from "lucide-react-native";
+import { CalendarCheck } from "lucide-react-native";
 import { goldGradient, goldPalette, shineGradient, xpGradient } from "../theme";
 import type { CelebrationEvent } from "../types";
-import { formatIsoDate } from "../utils/format";
+import { formatDateBr } from "../utils/format";
 import { hapticImpact, hapticSuccess } from "../utils/haptics";
 import { AchievementIcon } from "./achievement-icon";
 import { ConfettiBurst } from "./confetti-burst";
@@ -48,7 +48,7 @@ const SPARKLES = [
 export function AchievementUnlockedModal({ event, onDone }: AchievementUnlockedModalProps) {
   const insets = useSafeAreaInsets();
   const { conquista } = event;
-  const unlockedDate = formatIsoDate(event.dataConquista);
+  const unlockedDate = formatDateBr(conquista.desbloqueadaEm);
 
   const backdrop = useSharedValue(0);
   const card = useSharedValue(0);
@@ -161,7 +161,7 @@ export function AchievementUnlockedModal({ event, onDone }: AchievementUnlockedM
                 style={styles.medal}
               >
                 <View style={styles.medalInner}>
-                  <AchievementIcon icone={conquista.icone} size={48} color="#FFFFFF" />
+                  <AchievementIcon codigo={conquista.codigo} icone={conquista.icone} size={48} color="#FFFFFF" />
                 </View>
                 <Animated.View style={[styles.shine, shineStyle]}>
                   <LinearGradient
@@ -204,10 +204,6 @@ export function AchievementUnlockedModal({ event, onDone }: AchievementUnlockedM
           ) : null}
 
           <Animated.View entering={FadeInDown.delay(840).duration(320)} style={styles.chips}>
-            <View style={styles.chip}>
-              <Star size={13} color="#E8890C" fill="#F5B942" />
-              <Text style={styles.chipText}>{conquista.requisitoXp} XP</Text>
-            </View>
             {unlockedDate ? (
               <View style={styles.chip}>
                 <CalendarCheck size={13} color="#2C7BE5" />

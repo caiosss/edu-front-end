@@ -7,6 +7,7 @@ import Animated, {
   cancelAnimation,
   interpolateColor,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withDelay,
   withRepeat,
@@ -14,35 +15,37 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { Lock } from "lucide-react-native";
+import {
+  achievementProgressRatio,
+  formatAchievementProgress,
+} from "../../progress/labels";
 import { goldGradient } from "../theme";
 import type { Conquista } from "../types";
-import { formatIsoDate } from "../utils/format";
+import { formatDateBr } from "../utils/format";
 import { AchievementIcon } from "./achievement-icon";
+import { AnimatedXpBar } from "./animated-xp-bar";
 
 type AchievementBadgeProps = {
   conquista: Conquista;
-  unlocked: boolean;
-  dataConquista: string | null;
-  xpTotal: number | null;
   index: number;
+  /** A conquista mais proxima de desbloquear, destacada na grade. */
   isNext?: boolean;
   style?: StyleProp<ViewStyle>;
 };
 
 export function AchievementBadge({
   conquista,
-  unlocked,
-  dataConquista,
-  xpTotal,
   index,
   isNext = false,
   style,
 }: AchievementBadgeProps) {
+  const reduceMotion = useReducedMotion();
+  const unlocked = conquista.desbloqueadaEm !== null;
   const float = useSharedValue(0);
   const nextPulse = useSharedValue(0);
 
   useEffect(() => {
-    if (unlocked) {
+    if (unlocked && !reduceMotion) {
       float.value = withDelay(
         index * 140,
         withRepeat(
@@ -56,7 +59,7 @@ export function AchievementBadge({
       );
     }
 
-    if (isNext) {
+    if (isNext && !reduceMotion) {
       nextPulse.value = withRepeat(
         withSequence(withTiming(1, { duration: 900 }), withTiming(0, { duration: 900 })),
         -1,
@@ -68,32 +71,34 @@ export function AchievementBadge({
       cancelAnimation(float);
       cancelAnimation(nextPulse);
     };
-  }, [float, index, isNext, nextPulse, unlocked]);
+  }, [float, index, isNext, nextPulse, reduceMotion, unlocked]);
 
   const medalStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: -4 * float.value }],
   }));
 
   const nextBorderStyle = useAnimatedStyle(() => ({
-    borderColor: interpolateColor(nextPulse.value, [0, 1], ["#B7D6F7", "#2C7BE5"]),
+    borderColor: interpolateColor(nextPulse.value, [0, 1], ["#9CC7F5", "#2C7BE5"]),
   }));
 
-  const missingXp = xpTotal === null ? null : Math.max(0, conquista.requisitoXp - xpTotal);
-  const unlockedDate = formatIsoDate(dataConquista);
-
+  const unlockedDate = formatDateBr(conquista.desbloqueadaEm);
   const footerLabel = unlocked
     ? unlockedDate
       ? `Conquistada em ${unlockedDate}`
       : "Conquistada"
-    : missingXp !== null && missingXp > 0
-      ? `Faltam ${missingXp} XP`
-      : `${conquista.requisitoXp} XP`;
+    : conquista.progresso
+      ? formatAchievementProgress(conquista.progresso)
+      : "Em andamento";
 
   return (
     <Animated.View
       entering={FadeInDown.delay(Math.min(index, 12) * 70)
         .springify()
         .damping(14)}
+      accessible
+      accessibilityLabel={`${conquista.titulo}. ${
+        unlocked ? "Conquistada" : "Ainda não conquistada"
+      }. ${footerLabel}.`}
       style={[
         styles.tile,
         unlocked ? styles.tileUnlocked : styles.tileLocked,
@@ -116,12 +121,22 @@ export function AchievementBadge({
             end={{ x: 1, y: 1 }}
             style={styles.medal}
           >
-            <AchievementIcon icone={conquista.icone} size={26} color="#FFFFFF" />
+            <AchievementIcon
+              codigo={conquista.codigo}
+              icone={conquista.icone}
+              size={26}
+              color="#FFFFFF"
+            />
           </LinearGradient>
         ) : (
           <View style={[styles.medal, styles.medalLocked]}>
             <View style={styles.lockedIcon}>
-              <AchievementIcon icone={conquista.icone} size={24} color="#8A9BAD" />
+              <AchievementIcon
+                codigo={conquista.codigo}
+                icone={conquista.icone}
+                size={24}
+                color="#6B7F93"
+              />
             </View>
             <View style={styles.lockBadge}>
               <Lock size={10} color="#FFFFFF" />
@@ -135,9 +150,19 @@ export function AchievementBadge({
       </Text>
 
       {conquista.descricao ? (
-        <Text numberOfLines={2} style={styles.description}>
+        <Text numberOfLines={3} style={styles.description}>
           {conquista.descricao}
         </Text>
+      ) : null}
+
+      {!unlocked && conquista.progresso ? (
+        <View style={styles.progressBlock}>
+          <AnimatedXpBar
+            ratio={achievementProgressRatio(conquista.progresso)}
+            height={6}
+            delay={200 + Math.min(index, 12) * 60}
+          />
+        </View>
       ) : null}
 
       <View style={[styles.footerChip, unlocked ? styles.footerChipUnlocked : null]}>
@@ -200,7 +225,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#E3EAF2",
   },
   lockedIcon: {
-    opacity: 0.6,
+    opacity: 0.75,
   },
   lockBadge: {
     position: "absolute",
@@ -211,7 +236,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 2,
     borderColor: "#F4F8FC",
-    backgroundColor: "#7D94AB",
+    backgroundColor: "#6B7F93",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -222,13 +247,17 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   titleLocked: {
-    color: "#4F6982",
+    color: "#35506B",
   },
   description: {
-    color: "#5B738A",
+    color: "#4F6982",
     fontSize: 11,
     lineHeight: 15,
     textAlign: "center",
+  },
+  progressBlock: {
+    alignSelf: "stretch",
+    paddingHorizontal: 4,
   },
   footerChip: {
     marginTop: 2,
@@ -241,11 +270,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFE8A3",
   },
   footerText: {
-    color: "#4F6982",
-    fontSize: 10,
+    color: "#35506B",
+    fontSize: 11,
     fontWeight: "700",
+    textAlign: "center",
   },
   footerTextUnlocked: {
-    color: "#8A4B00",
+    color: "#7A4100",
   },
 });

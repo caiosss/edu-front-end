@@ -8,16 +8,15 @@ import {
   View,
 } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { Bell, Eye, Gem, Heart, LogOut, Medal, Settings, UserRound } from "lucide-react-native";
+import { Bell, Eye, Flame, Gem, Heart, LogOut, Medal, Settings, UserRound } from "lucide-react-native";
 import { AnimatedXpBar } from "../features/gamification/components/animated-xp-bar";
 import { LevelRing } from "../features/gamification/components/level-ring";
-import type { Nivel } from "../features/gamification/types";
-import { isNivelAtOrAhead, nivelRatio } from "../features/gamification/utils/level";
+import { nivelRatio } from "../features/gamification/utils/level";
 import SettingItem from "../features/navigation/components/settings-item";
 import { useAuth } from "../hooks/useAuth";
 import { useCaregiverProfile } from "../hooks/use-caregiver-profile";
 import { usePatientProfile } from "../hooks/use-patient-profile";
-import { useGamificationStore } from "../store/gamification-store";
+import { useGamification } from "../hooks/use-gamification";
 
 const parseDate = (value: string): Date | null => {
   const parsedDate = new Date(value);
@@ -81,8 +80,8 @@ export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScree
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [accessibilityEnabled, setAccessibilityEnabled] = useState(false);
-  const storeNivel = useGamificationStore((state) => state.nivel);
-  const storeXpTotal = useGamificationStore((state) => state.xpTotal);
+  // Progresso vem do gamification-service; o `/pacientes/me` so traz os dados cadastrais.
+  const { nivel: patientNivel, xpTotal, moedas, streak } = useGamification();
 
   const isProfileLoading = isCaregiverUser ? isCaregiverLoading : isPatientLoading;
   const profileErrorMessage = isCaregiverUser ? caregiverErrorMessage : patientErrorMessage;
@@ -97,23 +96,7 @@ export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScree
   const caregiverNames = patientProfile?.nomeCuidadores ?? [];
   const patientNames = caregiverProfile?.nomePacientes ?? [];
 
-  // A conclusao atualiza o nivel antes de o perfil refletir o XP (evento assincrono): usa o
-  // mais adiantado dos dois.
-  const patientNivel = useMemo<Nivel | null>(() => {
-    if (!patientProfile) {
-      return null;
-    }
-
-    const profileNivel: Nivel = {
-      atual: patientProfile.nivel,
-      xpNoNivel: patientProfile.xpNoNivel,
-      xpParaProximo: patientProfile.xpParaProximo,
-    };
-
-    return storeNivel && isNivelAtOrAhead(storeNivel, profileNivel) ? storeNivel : profileNivel;
-  }, [patientProfile, storeNivel]);
-
-  const patientXpTotal = Math.max(patientProfile?.xpTotal ?? 0, storeXpTotal ?? 0);
+  const patientXpTotal = xpTotal ?? 0;
 
   const accessibilityDescription = useMemo(
     () =>
@@ -231,9 +214,19 @@ export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScree
               </View>
             </View>
 
-            <View style={styles.coinChip}>
-              <Gem size={14} color="#845EF7" />
-              <Text style={styles.coinText}>{patientProfile.moedas} moedas</Text>
+            <View style={styles.chipRow}>
+              <View style={styles.coinChip}>
+                <Gem size={14} color="#845EF7" />
+                <Text style={styles.coinText}>{moedas} moedas</Text>
+              </View>
+              {streak && streak.atual > 0 ? (
+                <View style={styles.streakChip}>
+                  <Flame size={14} color="#E8590C" />
+                  <Text style={styles.streakText}>
+                    Sequência: {streak.atual} {streak.atual === 1 ? "dia" : "dias"}
+                  </Text>
+                </View>
+              ) : null}
             </View>
           </Animated.View>
 
@@ -417,8 +410,26 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 6,
   },
+  chipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  streakChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: "#FFF4E6",
+  },
+  streakText: {
+    color: "#7A3E00",
+    fontSize: 12,
+    fontWeight: "700",
+  },
   coinChip: {
-    alignSelf: "flex-start",
     flexDirection: "row",
     alignItems: "center",
     gap: 6,

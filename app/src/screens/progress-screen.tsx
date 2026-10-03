@@ -1,6 +1,8 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  BackHandler,
+  FlatList,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -9,238 +11,279 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { Medal, PartyPopper, Star, Trophy } from "lucide-react-native";
+import { ChevronLeft, CloudOff, Info, Medal } from "lucide-react-native";
 import { AchievementBadge } from "../features/gamification/components/achievement-badge";
-import { AchievementIcon } from "../features/gamification/components/achievement-icon";
-import { AnimatedXpBar } from "../features/gamification/components/animated-xp-bar";
-import { LevelRing } from "../features/gamification/components/level-ring";
-import { Sparkle } from "../features/gamification/components/sparkle";
-import { goldGradient, rewardCardGradient } from "../features/gamification/theme";
-import { nivelRatio } from "../features/gamification/utils/level";
+import type { ExtratoLinha, PeriodoResumo } from "../features/gamification/types";
+import { formatClock } from "../features/gamification/utils/format";
+import { AchievementsCard } from "../features/progress/components/achievements-card";
+import { RewardExplanationModal } from "../features/progress/components/reward-explanation-modal";
+import { RewardRow } from "../features/progress/components/reward-row";
+import { RewardsCard } from "../features/progress/components/rewards-card";
+import { TodayCard } from "../features/progress/components/today-card";
+import { TrendCard } from "../features/progress/components/trend-card";
+import { achievementProgressRatio } from "../features/progress/labels";
 import { useGamification } from "../hooks/use-gamification";
+import { useProgressSummary } from "../hooks/use-progress-summary";
+import { useRewardStatement } from "../hooks/use-reward-statement";
+
+type ProgressView = "resumo" | "conquistas" | "extrato";
 
 const SCREEN_PADDING = 20;
 const GRID_GAP = 12;
 const MAX_CONTENT_WIDTH = 560;
 
+function SubviewHeader({ title, onBack }: { title: string; onBack: () => void }) {
+  return (
+    <View style={styles.subviewHeader}>
+      <Pressable
+        onPress={onBack}
+        accessibilityRole="button"
+        accessibilityLabel="Voltar para o resumo"
+        hitSlop={8}
+        style={styles.backButton}
+      >
+        <ChevronLeft size={22} color="#12314C" />
+      </Pressable>
+      <Text style={styles.subviewTitle} accessibilityRole="header">
+        {title}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * Tela de Progresso (SPEC-007). Ordem fixa de leitura: Hoje, Tendencia, Conquistas e, por
+ * ultimo, Recompensas — o concreto e clinico antes do ludico.
+ */
 export default function ProgressScreen() {
   const { width } = useWindowDimensions();
-  const {
-    isPatient,
-    nivel,
-    xpTotal,
-    catalogo,
-    desbloqueadas,
-    isLoading,
-    errorMessage,
-    refreshGamification,
-  } = useGamification();
+  const { isPatient, conquistas, refreshGamification } = useGamification();
+  const [periodo, setPeriodo] = useState<PeriodoResumo>("SEMANA");
+  const [view, setView] = useState<ProgressView>("resumo");
+  const [recompensaAberta, setRecompensaAberta] = useState<ExtratoLinha | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const achievements = useMemo(
-    () =>
-      catalogo.map((conquista) => ({
-        conquista,
-        unlocked: conquista.id in desbloqueadas,
-        dataConquista: desbloqueadas[conquista.id] ?? null,
-      })),
-    [catalogo, desbloqueadas]
+  const { resumo, atualizadoEm, isLoading, errorMessage, isStale, refresh } = useProgressSummary(
+    periodo,
+    isPatient
   );
+  const extrato = useRewardStatement(isPatient && view === "extrato");
 
-  const unlockedCount = achievements.filter((achievement) => achievement.unlocked).length;
-  const nextAchievement = achievements.find((achievement) => !achievement.unlocked) ?? null;
-  const tileWidth =
-    (Math.min(width, MAX_CONTENT_WIDTH) - SCREEN_PADDING * 2 - GRID_GAP) / 2;
+  useEffect(() => {
+    if (view === "resumo") {
+      return;
+    }
+
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      setView("resumo");
+      return true;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [view]);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
 
     try {
-      await refreshGamification();
+      await Promise.all([refresh(), refreshGamification()]);
     } finally {
       setIsRefreshing(false);
     }
-  }, [refreshGamification]);
+  }, [refresh, refreshGamification]);
+
+  const proximaConquista = useMemo(
+    () =>
+      conquistas
+        .filter((conquista) => conquista.desbloqueadaEm === null && conquista.progresso)
+        .sort(
+          (a, b) => achievementProgressRatio(b.progresso) - achievementProgressRatio(a.progresso)
+        )[0] ?? null,
+    [conquistas]
+  );
 
   if (!isPatient) {
     return (
       <View style={styles.emptyContainer}>
-        <Animated.View entering={FadeInDown.duration(240)} style={styles.card}>
+        <Animated.View entering={FadeInDown.duration(240)} style={styles.emptyCard}>
           <View style={styles.emptyIcon}>
             <Medal size={28} color="#2C7BE5" />
           </View>
-          <Text style={styles.cardTitle}>Disponível para pacientes</Text>
+          <Text style={styles.emptyTitle}>Disponível para pacientes</Text>
           <Text style={styles.supportingText}>
-            Nível, XP e conquistas acompanham os registros de cuidado de cada paciente.
+            O progresso acompanha os registros de cuidado de cada paciente.
           </Text>
         </Animated.View>
       </View>
     );
   }
 
-  const nextMissingXp =
-    nextAchievement && xpTotal !== null
-      ? Math.max(0, nextAchievement.conquista.requisitoXp - xpTotal)
-      : null;
-  const nextRatio =
-    nextAchievement && xpTotal !== null && nextAchievement.conquista.requisitoXp > 0
-      ? xpTotal / nextAchievement.conquista.requisitoXp
-      : 0;
+  if (view === "conquistas") {
+    const tileWidth = (Math.min(width, MAX_CONTENT_WIDTH) - SCREEN_PADDING * 2 - GRID_GAP) / 2;
+    const obtidas = conquistas.filter((conquista) => conquista.desbloqueadaEm !== null).length;
+
+    return (
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <SubviewHeader title="Conquistas" onBack={() => setView("resumo")} />
+        {conquistas.length > 0 ? (
+          <Text style={styles.supportingText}>
+            {obtidas} de {conquistas.length} conquistadas
+          </Text>
+        ) : (
+          <Text style={styles.supportingText}>Nenhuma conquista disponível ainda.</Text>
+        )}
+        <View style={styles.grid}>
+          {conquistas.map((conquista, index) => (
+            <AchievementBadge
+              key={conquista.codigo}
+              conquista={conquista}
+              index={index}
+              isNext={conquista.codigo === proximaConquista?.codigo}
+              style={{ width: tileWidth }}
+            />
+          ))}
+        </View>
+      </ScrollView>
+    );
+  }
+
+  if (view === "extrato") {
+    return (
+      <View style={styles.flex}>
+        <View style={styles.statementHeader}>
+          <SubviewHeader title="Extrato de recompensas" onBack={() => setView("resumo")} />
+          <Text style={styles.supportingText}>Toque em uma linha para ver por que ela aconteceu.</Text>
+        </View>
+        <FlatList
+          data={extrato.linhas}
+          keyExtractor={(linha, index) => `${linha.quando}-${linha.regraCodigo}-${index}`}
+          contentContainerStyle={styles.statementList}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          renderItem={({ item }) => <RewardRow linha={item} onPress={setRecompensaAberta} />}
+          onEndReachedThreshold={0.4}
+          onEndReached={() => void extrato.loadMore()}
+          refreshControl={
+            <RefreshControl
+              refreshing={extrato.isLoading && extrato.linhas.length > 0}
+              onRefresh={() => void extrato.refresh()}
+              tintColor="#2C7BE5"
+              colors={["#2C7BE5"]}
+            />
+          }
+          ListEmptyComponent={
+            extrato.isLoading ? (
+              <ActivityIndicator color="#2C7BE5" style={styles.listLoading} />
+            ) : (
+              <Text style={styles.supportingText}>
+                {extrato.errorMessage || "Suas recompensas aparecem aqui depois dos primeiros registros."}
+              </Text>
+            )
+          }
+          ListFooterComponent={
+            extrato.isLoadingMore ? <ActivityIndicator color="#2C7BE5" style={styles.listLoading} /> : null
+          }
+        />
+        <RewardExplanationModal linha={recompensaAberta} onClose={() => setRecompensaAberta(null)} />
+      </View>
+    );
+  }
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={isRefreshing}
-          onRefresh={() => void handleRefresh()}
-          tintColor="#2C7BE5"
-          colors={["#2C7BE5"]}
-        />
-      }
-    >
-      <Animated.View entering={FadeInDown.duration(260)} style={styles.heroShadow}>
-        <LinearGradient
-          colors={rewardCardGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.hero}
-        >
-          <Sparkle x={24} y={22} size={12} delay={200} />
-          <Sparkle x={300} y={26} size={10} delay={900} color="#FFFFFF" />
-          <Sparkle x={150} y={150} size={9} delay={600} />
-
-          <LevelRing nivel={nivel} size={112} strokeWidth={10} tone="dark" delay={200} />
-
-          <View style={styles.heroInfo}>
-            <Text style={styles.heroEyebrow}>Seu progresso</Text>
-            <Text style={styles.heroTitle}>
-              {nivel ? `Nível ${nivel.atual}` : "Carregando..."}
-            </Text>
-            <Text style={styles.heroXp}>{xpTotal ?? 0} XP no total</Text>
-            <AnimatedXpBar
-              ratio={nivelRatio(nivel)}
-              levelKey={nivel?.atual}
-              colors={goldGradient}
-              trackColor="rgba(255, 255, 255, 0.16)"
-              height={10}
-              delay={300}
-            />
-            {nivel ? (
-              <Text style={styles.heroHint}>
-                Faltam {nivel.xpParaProximo} XP para o nível {nivel.atual + 1}
-              </Text>
-            ) : null}
-          </View>
-        </LinearGradient>
-      </Animated.View>
-
-      <Animated.View entering={FadeInDown.delay(80).duration(260)} style={styles.statsRow}>
-        <View style={[styles.card, styles.statCard]}>
-          <View style={[styles.statIcon, styles.statIconGold]}>
-            <Trophy size={18} color="#E8890C" />
-          </View>
-          <Text style={styles.statValue}>
-            {unlockedCount}/{catalogo.length}
-          </Text>
-          <Text style={styles.statLabel}>conquistas</Text>
-        </View>
-        <View style={[styles.card, styles.statCard]}>
-          <View style={styles.statIcon}>
-            <Star size={18} color="#2C7BE5" />
-          </View>
-          <Text style={styles.statValue}>{nivel?.xpNoNivel ?? 0}</Text>
-          <Text style={styles.statLabel}>XP neste nível</Text>
-        </View>
-      </Animated.View>
-
-      {nextAchievement ? (
-        <Animated.View entering={FadeInDown.delay(140).duration(260)} style={styles.card}>
-          <Text style={styles.sectionEyebrow}>Próxima conquista</Text>
-          <View style={styles.nextRow}>
-            <View style={styles.nextIcon}>
-              <AchievementIcon icone={nextAchievement.conquista.icone} size={24} color="#2C7BE5" />
-            </View>
-            <View style={styles.nextInfo}>
-              <Text style={styles.cardTitle}>{nextAchievement.conquista.titulo}</Text>
-              <Text style={styles.supportingText}>
-                {nextMissingXp !== null && nextMissingXp > 0
-                  ? `Faltam ${nextMissingXp} XP`
-                  : `${nextAchievement.conquista.requisitoXp} XP`}
-              </Text>
-            </View>
-          </View>
-          <AnimatedXpBar ratio={nextRatio} height={10} delay={350} />
-        </Animated.View>
-      ) : unlockedCount > 0 ? (
-        <Animated.View entering={FadeInDown.delay(140).duration(260)} style={styles.card}>
-          <View style={styles.nextRow}>
-            <View style={[styles.nextIcon, styles.statIconGold]}>
-              <PartyPopper size={24} color="#E8890C" />
-            </View>
-            <View style={styles.nextInfo}>
-              <Text style={styles.cardTitle}>Todas as conquistas desbloqueadas!</Text>
-              <Text style={styles.supportingText}>Seu cuidado diário fez toda a diferença.</Text>
-            </View>
-          </View>
-        </Animated.View>
-      ) : null}
-
-      <Animated.View entering={FadeInDown.delay(200).duration(260)} style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Conquistas</Text>
-        {catalogo.length > 0 ? (
-          <Text style={styles.sectionCounter}>
-            {unlockedCount} de {catalogo.length}
-          </Text>
-        ) : null}
-      </Animated.View>
-
-      {isLoading && catalogo.length === 0 ? (
-        <View style={[styles.card, styles.loadingBlock]}>
-          <ActivityIndicator size="small" color="#2C7BE5" />
-          <Text style={styles.supportingText}>Carregando suas conquistas...</Text>
-        </View>
-      ) : null}
-
-      {errorMessage && catalogo.length === 0 && !isLoading ? (
-        <View style={styles.card}>
-          <Text style={styles.errorText}>{errorMessage}</Text>
-          <Pressable onPress={() => void handleRefresh()} style={styles.retryButton}>
-            <Text style={styles.retryButtonText}>Tentar novamente</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      {!isLoading && !errorMessage && catalogo.length === 0 ? (
-        <View style={styles.card}>
-          <Text style={styles.supportingText}>
-            Nenhuma conquista cadastrada ainda. Continue registrando seus cuidados!
-          </Text>
-        </View>
-      ) : null}
-
-      <View style={styles.grid}>
-        {achievements.map((achievement, index) => (
-          <AchievementBadge
-            key={achievement.conquista.id}
-            conquista={achievement.conquista}
-            unlocked={achievement.unlocked}
-            dataConquista={achievement.dataConquista}
-            xpTotal={xpTotal}
-            index={index}
-            isNext={achievement.conquista.id === nextAchievement?.conquista.id}
-            style={{ width: tileWidth }}
+    <View style={styles.flex}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={() => void handleRefresh()}
+            tintColor="#2C7BE5"
+            colors={["#2C7BE5"]}
           />
-        ))}
-      </View>
-    </ScrollView>
+        }
+      >
+        {isStale && atualizadoEm ? (
+          <View style={styles.staleBanner} accessibilityLiveRegion="polite">
+            <CloudOff size={16} color="#35506B" />
+            <Text style={styles.staleText}>Atualizado às {formatClock(atualizadoEm)}</Text>
+          </View>
+        ) : null}
+
+        {!resumo && isLoading ? (
+          <View style={styles.loadingBlock}>
+            <ActivityIndicator color="#2C7BE5" />
+            <Text style={styles.supportingText}>Carregando seu progresso...</Text>
+          </View>
+        ) : null}
+
+        {!resumo && !isLoading && errorMessage ? (
+          <View style={styles.errorCard}>
+            <Text style={styles.supportingText}>
+              Não foi possível carregar seu progresso agora.
+            </Text>
+            <Pressable onPress={() => void refresh()} accessibilityRole="button" style={styles.retryButton}>
+              <Text style={styles.retryText}>Tentar de novo</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {resumo ? (
+          <>
+            <Animated.View entering={FadeInDown.duration(260)}>
+              <TodayCard hoje={resumo.hoje} onRetry={() => void refresh()} />
+            </Animated.View>
+
+            <Animated.View entering={FadeInDown.delay(70).duration(260)}>
+              <TrendCard
+                periodo={resumo.periodo}
+                streak={resumo.streak}
+                tipo={periodo}
+                onChangeTipo={setPeriodo}
+                onRetry={() => void refresh()}
+              />
+            </Animated.View>
+
+            <Animated.View entering={FadeInDown.delay(140).duration(260)}>
+              <AchievementsCard
+                recentes={resumo.conquistasRecentes}
+                todas={conquistas}
+                onSeeAll={() => setView("conquistas")}
+              />
+            </Animated.View>
+
+            <Animated.View entering={FadeInDown.delay(210).duration(260)}>
+              <RewardsCard
+                nivel={resumo.nivel}
+                xpTotal={resumo.xpTotal}
+                recompensas={resumo.recompensasRecentes}
+                onOpenReward={setRecompensaAberta}
+                onSeeStatement={() => setView("extrato")}
+              />
+            </Animated.View>
+
+            <View style={styles.disclaimer}>
+              <Info size={14} color="#4F6982" />
+              <Text style={styles.disclaimerText}>
+                XP e conquistas acompanham seu uso do app. Elas não substituem a orientação da
+                sua equipe de saúde.
+              </Text>
+            </View>
+          </>
+        ) : null}
+      </ScrollView>
+
+      <RewardExplanationModal linha={recompensaAberta} onClose={() => setRecompensaAberta(null)} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   scrollContent: {
     width: "100%",
     maxWidth: MAX_CONTENT_WIDTH,
@@ -255,6 +298,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: SCREEN_PADDING,
   },
+  emptyCard: {
+    borderRadius: 18,
+    padding: 18,
+    backgroundColor: "#FDFEFF",
+    gap: 10,
+  },
   emptyIcon: {
     width: 56,
     height: 56,
@@ -264,166 +313,108 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "#E8F2FF",
   },
-  heroShadow: {
-    borderRadius: 22,
-    shadowColor: "#12314C",
-    shadowOpacity: 0.25,
-    shadowOffset: { width: 0, height: 10 },
-    shadowRadius: 18,
-    elevation: 8,
-  },
-  hero: {
-    borderRadius: 22,
-    padding: 18,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
-  heroInfo: {
-    flex: 1,
-    gap: 4,
-  },
-  heroEyebrow: {
-    color: "#8FB7E0",
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 1,
-    textTransform: "uppercase",
-  },
-  heroTitle: {
-    color: "#FFFFFF",
-    fontSize: 24,
-    fontWeight: "900",
-  },
-  heroXp: {
-    color: "#FFD43B",
-    fontSize: 14,
-    fontWeight: "800",
-    marginBottom: 4,
-  },
-  heroHint: {
-    color: "#B7CFE6",
-    fontSize: 12,
-    marginTop: 2,
-  },
-  card: {
-    borderRadius: 18,
-    padding: 16,
-    backgroundColor: "#FDFEFF",
-    shadowColor: "#173B5D",
-    shadowOpacity: 0.07,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 3,
-    gap: 10,
-  },
-  statsRow: {
-    flexDirection: "row",
-    gap: GRID_GAP,
-  },
-  statCard: {
-    flex: 1,
-    alignItems: "flex-start",
-    gap: 4,
-  },
-  statIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#E8F2FF",
-  },
-  statIconGold: {
-    backgroundColor: "#FFF3BF",
-  },
-  statValue: {
+  emptyTitle: {
     color: "#12314C",
-    fontSize: 22,
-    fontWeight: "900",
-  },
-  statLabel: {
-    color: "#5B738A",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  sectionEyebrow: {
-    color: "#2C7BE5",
-    fontSize: 11,
+    fontSize: 17,
     fontWeight: "800",
-    letterSpacing: 1,
-    textTransform: "uppercase",
-  },
-  nextRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  nextIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#E8F2FF",
-  },
-  nextInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#12314C",
+    textAlign: "center",
   },
   supportingText: {
     color: "#35506B",
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 14,
+    lineHeight: 20,
   },
-  sectionHeader: {
+  staleBanner: {
     flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    marginTop: 4,
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "#EEF2F6",
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#12314C",
-  },
-  sectionCounter: {
-    color: "#5B738A",
+  staleText: {
+    color: "#35506B",
     fontSize: 13,
     fontWeight: "700",
+  },
+  loadingBlock: {
+    minHeight: 120,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  errorCard: {
+    borderRadius: 18,
+    padding: 16,
+    backgroundColor: "#FDFEFF",
+    gap: 10,
+  },
+  retryButton: {
+    alignSelf: "flex-start",
+    minHeight: 44,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    justifyContent: "center",
+    backgroundColor: "#E8F2FF",
+  },
+  retryText: {
+    color: "#1A5DB5",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  disclaimer: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    paddingHorizontal: 4,
+    marginTop: 4,
+  },
+  disclaimerText: {
+    flex: 1,
+    color: "#4F6982",
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  subviewHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#E8EEF5",
+  },
+  subviewTitle: {
+    flex: 1,
+    color: "#12314C",
+    fontSize: 20,
+    fontWeight: "800",
   },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: GRID_GAP,
-    paddingTop: 6,
+    paddingTop: 8,
   },
-  loadingBlock: {
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 72,
+  statementHeader: {
+    paddingHorizontal: SCREEN_PADDING,
+    paddingTop: 18,
+    paddingBottom: 8,
+    gap: 8,
   },
-  errorText: {
-    color: "#9B2F2F",
-    fontSize: 13,
-    fontWeight: "600",
+  statementList: {
+    paddingHorizontal: SCREEN_PADDING,
+    paddingBottom: 24,
   },
-  retryButton: {
-    minHeight: 40,
-    borderRadius: 10,
-    backgroundColor: "#2C7BE5",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 12,
+  separator: {
+    height: 8,
   },
-  retryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "700",
+  listLoading: {
+    marginVertical: 16,
   },
 });

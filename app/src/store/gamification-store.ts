@@ -3,31 +3,31 @@ import type {
   CelebrationEvent,
   ConclusaoResponse,
   Conquista,
-  ConquistaPaciente,
+  GamificationProfile,
   Nivel,
+  Streak,
 } from "../features/gamification/types";
 import { isNivelAtOrAhead } from "../features/gamification/utils/level";
-import type { PatientProfileResponse } from "../features/profile/types";
 
 type GamificationState = {
-  pacienteId: string | null;
+  /** Sessao dona do estado; trocar de sessao zera tudo. */
+  sessionKey: string | null;
   nivel: Nivel | null;
   xpTotal: number | null;
   moedas: number;
-  catalogo: Conquista[];
-  /** conquistaId -> dataConquista */
-  desbloqueadas: Record<string, string | null>;
+  streak: Streak | null;
+  conquistas: Conquista[];
   hasLoadedAchievements: boolean;
   isLoading: boolean;
   errorMessage: string;
   celebrationQueue: CelebrationEvent[];
-  bindPaciente: (pacienteId: string) => void;
+  bindSession: (sessionKey: string) => void;
   setLoading: (isLoading: boolean) => void;
   setErrorMessage: (errorMessage: string) => void;
-  hydrateFromProfile: (profile: PatientProfileResponse) => void;
+  hydrateFromProfile: (profile: GamificationProfile) => void;
   applyConclusao: (conclusao: ConclusaoResponse) => void;
-  setCatalogo: (catalogo: Conquista[]) => void;
-  mergeUnlocked: (conquistas: ConquistaPaciente[]) => number;
+  /** @returns quantas conquistas foram desbloqueadas desde a leitura anterior */
+  setConquistas: (conquistas: Conquista[]) => number;
   /** Remove o evento da frente, apenas se ainda for `id` (timers atrasados nao removem outro). */
   dequeueCelebration: (id: string) => void;
   reset: () => void;
@@ -37,12 +37,12 @@ let eventSequence = 0;
 const nextEventId = () => `${Date.now()}-${eventSequence++}`;
 
 const initialState = {
-  pacienteId: null,
+  sessionKey: null,
   nivel: null,
   xpTotal: null,
   moedas: 0,
-  catalogo: [],
-  desbloqueadas: {},
+  streak: null,
+  conquistas: [],
   hasLoadedAchievements: false,
   isLoading: false,
   errorMessage: "",
@@ -51,48 +51,32 @@ const initialState = {
 
 export const useGamificationStore = create<GamificationState>((set, get) => ({
   ...initialState,
-  bindPaciente: (pacienteId) => {
-    if (get().pacienteId !== pacienteId) {
-      set({ ...initialState, pacienteId });
+  bindSession: (sessionKey) => {
+    if (get().sessionKey !== sessionKey) {
+      set({ ...initialState, sessionKey });
     }
   },
   setLoading: (isLoading) => set({ isLoading }),
   setErrorMessage: (errorMessage) => set({ errorMessage }),
   hydrateFromProfile: (profile) =>
     set((state) => {
-      if (state.pacienteId && state.pacienteId !== profile.id) {
-        return state;
-      }
-
-      const profileNivel: Nivel = {
-        atual: profile.nivel,
-        xpNoNivel: profile.xpNoNivel,
-        xpParaProximo: profile.xpParaProximo,
-      };
-
-      // O auth-service soma o XP por evento Kafka, depois da resposta do mission-service:
+      // O gamification-service concede por evento, depois da resposta do mission-service:
       // um perfil lido logo apos a conclusao pode estar atrasado e nao deve fazer a barra voltar.
-      const isAhead = isNivelAtOrAhead(profileNivel, state.nivel);
+      const isAhead = isNivelAtOrAhead(profile.nivel, state.nivel);
 
-      // A subida de nivel tambem pode chegar so pelo perfil: XP que nao passa pela resposta da
-      // conclusao (DIA_COMPLETO do fechamento do dia) ou XP legado que so existe no auth-service.
+      // A subida de nivel tambem chega so por aqui: XP de jogo e do fechamento do dia nunca
+      // passam pela resposta da conclusao.
       const levelUp: CelebrationEvent[] =
-        isAhead && state.nivel && profileNivel.atual > state.nivel.atual
-          ? [
-              {
-                id: nextEventId(),
-                kind: "levelUp",
-                de: state.nivel.atual,
-                para: profileNivel.atual,
-              },
-            ]
+        isAhead && state.nivel && profile.nivel.atual > state.nivel.atual
+          ? [{ id: nextEventId(), kind: "levelUp", de: state.nivel.atual, para: profile.nivel.atual }]
           : [];
 
       return {
-        nivel: isAhead ? profileNivel : state.nivel,
+        nivel: isAhead ? profile.nivel : state.nivel,
         xpTotal:
           state.xpTotal === null ? profile.xpTotal : Math.max(state.xpTotal, profile.xpTotal),
         moedas: profile.moedas,
+        streak: profile.streak,
         celebrationQueue:
           levelUp.length > 0 ? [...state.celebrationQueue, ...levelUp] : state.celebrationQueue,
       };
@@ -100,12 +84,9 @@ export const useGamificationStore = create<GamificationState>((set, get) => ({
   applyConclusao: (conclusao) =>
     set((state) => {
       const nivelAnterior = state.nivel;
-      // Sem `nivel` na resposta (API anterior a SPEC-002), o nivel so muda quando o perfil
-      // refletir o XP, e `hydrateFromProfile` detecta a subida.
-      const nivelNovo =
-        conclusao.nivel && isNivelAtOrAhead(conclusao.nivel, nivelAnterior)
-          ? conclusao.nivel
-          : nivelAnterior;
+      const nivelNovo = isNivelAtOrAhead(conclusao.nivel, nivelAnterior)
+        ? conclusao.nivel
+        : (nivelAnterior ?? conclusao.nivel);
       const events: CelebrationEvent[] = [
         {
           id: nextEventId(),
@@ -116,7 +97,7 @@ export const useGamificationStore = create<GamificationState>((set, get) => ({
         },
       ];
 
-      if (nivelAnterior && nivelNovo && nivelNovo.atual > nivelAnterior.atual) {
+      if (nivelAnterior && nivelNovo.atual > nivelAnterior.atual) {
         events.push({
           id: nextEventId(),
           kind: "levelUp",
@@ -131,34 +112,29 @@ export const useGamificationStore = create<GamificationState>((set, get) => ({
         celebrationQueue: [...state.celebrationQueue, ...events],
       };
     }),
-  setCatalogo: (catalogo) =>
-    set({ catalogo: [...catalogo].sort((a, b) => a.requisitoXp - b.requisitoXp) }),
-  mergeUnlocked: (conquistas) => {
+  setConquistas: (conquistas) => {
     const state = get();
-    const desbloqueadas = { ...state.desbloqueadas };
-    const catalogoPorId = new Map(state.catalogo.map((conquista) => [conquista.id, conquista]));
-    const events: CelebrationEvent[] = [];
+    const jaDesbloqueadas = new Set(
+      state.conquistas
+        .filter((conquista) => conquista.desbloqueadaEm !== null)
+        .map((conquista) => conquista.codigo)
+    );
 
-    conquistas.forEach(({ conquista, dataConquista }) => {
-      catalogoPorId.set(conquista.id, conquista);
-
-      if (conquista.id in desbloqueadas) {
-        return;
-      }
-
-      desbloqueadas[conquista.id] = dataConquista;
-
-      // Na primeira carga as conquistas ja existiam: so celebra o que destravar depois.
-      if (state.hasLoadedAchievements) {
-        events.push({ id: nextEventId(), kind: "achievement", conquista, dataConquista });
-      }
-    });
+    // Na primeira leitura as conquistas ja existiam: so celebra o que destravar depois.
+    const events: CelebrationEvent[] = state.hasLoadedAchievements
+      ? conquistas
+          .filter(
+            (conquista) =>
+              conquista.desbloqueadaEm !== null && !jaDesbloqueadas.has(conquista.codigo)
+          )
+          .map((conquista) => ({ id: nextEventId(), kind: "achievement", conquista }))
+      : [];
 
     set({
-      desbloqueadas,
+      conquistas,
       hasLoadedAchievements: true,
-      catalogo: Array.from(catalogoPorId.values()).sort((a, b) => a.requisitoXp - b.requisitoXp),
-      celebrationQueue: [...state.celebrationQueue, ...events],
+      celebrationQueue:
+        events.length > 0 ? [...state.celebrationQueue, ...events] : state.celebrationQueue,
     });
 
     return events.length;

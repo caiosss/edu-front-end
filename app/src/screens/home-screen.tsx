@@ -4,6 +4,7 @@ import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import {
   Bell,
   CircleStar,
+  Flame,
   GlassWater,
   Pill,
   Sparkles,
@@ -28,7 +29,7 @@ import ChecklistCard, {
 } from "../features/navigation/components/check-list-card";
 import { useAuth } from "../hooks/useAuth";
 import { useCompleteMission } from "../hooks/use-complete-mission";
-import { syncAchievementsAfterReward, useGamification } from "../hooks/use-gamification";
+import { syncGamificationAfterReward, useGamification } from "../hooks/use-gamification";
 import { useHomeMissions } from "../hooks/use-home-missions";
 import { useGamificationStore } from "../store/gamification-store";
 
@@ -114,7 +115,7 @@ export default function HomeScreen() {
     completingMissionKeys,
     errorMessage: completeMissionErrorMessage,
   } = useCompleteMission();
-  const { isPatient, nivel, xpTotal } = useGamification();
+  const { isPatient, nivel, xpTotal, streak } = useGamification();
   const applyConclusao = useGamificationStore((state) => state.applyConclusao);
 
   const [takenMedicationIds, setTakenMedicationIds] = useState<string[]>([]);
@@ -135,7 +136,7 @@ export default function HomeScreen() {
 
       // O estado `concluido` e derivado no backend; a conquista destrava de forma assincrona.
       void refreshHomeMissions();
-      syncAchievementsAfterReward();
+      syncGamificationAfterReward();
     },
     [applyConclusao, refreshHomeMissions]
   );
@@ -485,6 +486,14 @@ export default function HomeScreen() {
                   ? `Faltam ${nivel.xpParaProximo} XP para o nível ${nivel.atual + 1}`
                   : "Carregando seu progresso..."}
               </Text>
+              {streak && streak.atual > 0 ? (
+                <View style={styles.streakChip}>
+                  <Flame size={13} color="#E8590C" />
+                  <Text style={styles.streakText}>
+                    Sequência: {streak.atual} {streak.atual === 1 ? "dia" : "dias"}
+                  </Text>
+                </View>
+              ) : null}
             </View>
           </Animated.View>
         ) : null}
@@ -613,6 +622,21 @@ const styles = StyleSheet.create({
   levelHint: {
     color: "#5B738A",
     fontSize: 12,
+  },
+  streakChip: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: "#FFF4E6",
+  },
+  streakText: {
+    color: "#7A3E00",
+    fontSize: 12,
+    fontWeight: "700",
   },
   card: {
     borderRadius: 18,

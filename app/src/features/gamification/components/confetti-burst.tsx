@@ -5,6 +5,7 @@ import Animated, {
   cancelAnimation,
   useAnimatedStyle,
   useSharedValue,
+  useReducedMotion,
   withTiming,
   type SharedValue,
 } from "react-native-reanimated";
@@ -148,6 +149,7 @@ export function ConfettiBurst({
   sizeRange = DEFAULT_SIZE_RANGE,
 }: ConfettiBurstProps) {
   const progress = useSharedValue(0);
+  const reduceMotion = useReducedMotion();
 
   // Regerado apenas quando uma nova explosao e disparada; mudar props no meio do voo nao
   // deve reembaralhar as particulas.
@@ -196,7 +198,7 @@ export function ConfettiBurst({
     };
   }, [burstKey, progress, totalDuration]);
 
-  if (specs.length === 0) {
+  if (reduceMotion || specs.length === 0) {
     return null;
   }
 

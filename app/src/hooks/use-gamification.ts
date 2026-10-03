@@ -1,30 +1,25 @@
 import { useEffect, useMemo } from "react";
-import type { PatientProfileResponse } from "../features/profile/types";
 import {
-  fetchAchievementCatalog,
-  fetchPatientAchievements,
-} from "../services/achievements-service";
-import { fetchCurrentPatientProfile } from "../services/patient-service";
+  fetchGamificationAchievements,
+  fetchGamificationProfile,
+} from "../services/gamification-service";
 import { useAuthStore } from "../store/auth-store";
 import { useGamificationStore } from "../store/gamification-store";
 import { getPacienteIdFromToken } from "../utils/jwt";
 
 /**
- * A conquista destrava de forma assincrona (mission-service -> xp-events -> achievement-service),
- * entao a resposta da conclusao ainda nao a traz. Consulta algumas vezes e para ao achar novidade.
+ * O gamification-service concede XP e conquistas ao consumir os eventos de dominio (outbox ->
+ * Kafka), depois da resposta da conclusao. Le de novo algumas vezes para trazer o que chegou.
  */
-const ACHIEVEMENT_SYNC_DELAYS_MS = [1500, 4000, 9000];
+const SYNC_DELAYS_MS = [1500, 4000, 9000];
 
 let syncTimers: ReturnType<typeof setTimeout>[] = [];
 let loadPromise: Promise<void> | null = null;
 /** Token para o qual a gamificacao ja foi carregada: evita recarregar a cada tela montada. */
 let loadedToken: string | null = null;
 
-/**
- * Sessao de paciente. O token so traz `pacienteId` desde a SPEC-003; com a API anterior, o tipo
- * vem da resposta do login e o id, do perfil.
- */
-const isPatientSession = (token: string | null, tipoUsuario: string | null) =>
+/** As rotas `/gamification/*` so atendem paciente; o alvo e sempre o do token. */
+export const isPatientSession = (token: string | null, tipoUsuario: string | null) =>
   Boolean(token) &&
   (Boolean(getPacienteIdFromToken(token)) || tipoUsuario?.toUpperCase() === "PACIENTE");
 
@@ -48,62 +43,36 @@ export const loadGamification = (): Promise<void> => {
   }
 
   loadedToken = token;
-  useGamificationStore.getState().setLoading(true);
-  useGamificationStore.getState().setErrorMessage("");
+  const store = useGamificationStore.getState();
+  store.bindSession(token);
+  store.setLoading(true);
+  store.setErrorMessage("");
 
   loadPromise = (async () => {
-    let failure: unknown = null;
-    let profile: PatientProfileResponse | null = null;
-
-    try {
-      profile = await fetchCurrentPatientProfile();
-    } catch (error) {
-      failure = error;
-    }
-
-    // A sessao pode ter mudado enquanto a requisicao voltava.
-    if (useAuthStore.getState().token !== token) {
-      return;
-    }
-
-    const pacienteId = getPacienteIdFromToken(token) ?? profile?.id ?? null;
-
-    if (!pacienteId) {
-      useGamificationStore.getState().setErrorMessage(errorMessageOf(failure));
-      return;
-    }
-
-    useGamificationStore.getState().bindPaciente(pacienteId);
-    useGamificationStore.getState().setLoading(true);
-
-    if (profile) {
-      useGamificationStore.getState().hydrateFromProfile(profile);
-    }
-
-    const [catalogo, conquistas] = await Promise.allSettled([
-      fetchAchievementCatalog(),
-      fetchPatientAchievements(pacienteId),
+    const [perfil, conquistas] = await Promise.allSettled([
+      fetchGamificationProfile(),
+      fetchGamificationAchievements(),
     ]);
 
+    // A sessao pode ter mudado enquanto as requisicoes voltavam.
     if (useAuthStore.getState().token !== token) {
       return;
     }
 
     const state = useGamificationStore.getState();
 
-    if (catalogo.status === "fulfilled") {
-      state.setCatalogo(catalogo.value);
-    } else {
-      failure = failure ?? catalogo.reason;
+    if (perfil.status === "fulfilled") {
+      state.hydrateFromProfile(perfil.value);
     }
 
     if (conquistas.status === "fulfilled") {
-      state.mergeUnlocked(conquistas.value);
-    } else {
-      failure = failure ?? conquistas.reason;
+      state.setConquistas(conquistas.value);
     }
 
-    state.setErrorMessage(failure ? errorMessageOf(failure) : "");
+    const failure = [perfil, conquistas].find(
+      (result): result is PromiseRejectedResult => result.status === "rejected"
+    );
+    state.setErrorMessage(failure ? errorMessageOf(failure.reason) : "");
   })().finally(() => {
     loadPromise = null;
     useGamificationStore.getState().setLoading(false);
@@ -112,27 +81,24 @@ export const loadGamification = (): Promise<void> => {
   return loadPromise;
 };
 
-export const syncAchievementsAfterReward = () => {
+/** Depois de uma acao que rende XP (conclusao ou rodada de jogo). */
+export const syncGamificationAfterReward = () => {
   const token = useAuthStore.getState().token;
-  const pacienteId =
-    getPacienteIdFromToken(token) ?? useGamificationStore.getState().pacienteId;
   cancelGamificationSync();
 
-  if (!token || !pacienteId) {
+  if (!token) {
     return;
   }
 
-  let hasFoundNewAchievement = false;
-
-  syncTimers = ACHIEVEMENT_SYNC_DELAYS_MS.map((delay) =>
+  syncTimers = SYNC_DELAYS_MS.map((delay) =>
     setTimeout(async () => {
-      if (hasFoundNewAchievement || useAuthStore.getState().token !== token) {
+      if (useAuthStore.getState().token !== token) {
         return;
       }
 
-      const [conquistas, profile] = await Promise.allSettled([
-        fetchPatientAchievements(pacienteId),
-        fetchCurrentPatientProfile(),
+      const [perfil, conquistas] = await Promise.allSettled([
+        fetchGamificationProfile(),
+        fetchGamificationAchievements(),
       ]);
 
       if (useAuthStore.getState().token !== token) {
@@ -141,14 +107,12 @@ export const syncAchievementsAfterReward = () => {
 
       const state = useGamificationStore.getState();
 
-      // Na API anterior a SPEC-002 e o perfil que revela o nivel novo.
-      if (profile.status === "fulfilled") {
-        state.hydrateFromProfile(profile.value);
+      if (perfil.status === "fulfilled") {
+        state.hydrateFromProfile(perfil.value);
       }
 
-      if (conquistas.status === "fulfilled" && state.mergeUnlocked(conquistas.value) > 0) {
-        hasFoundNewAchievement = true;
-        cancelGamificationSync();
+      if (conquistas.status === "fulfilled") {
+        state.setConquistas(conquistas.value);
       }
     }, delay)
   );
@@ -162,8 +126,8 @@ export function useGamification() {
   const nivel = useGamificationStore((state) => state.nivel);
   const xpTotal = useGamificationStore((state) => state.xpTotal);
   const moedas = useGamificationStore((state) => state.moedas);
-  const catalogo = useGamificationStore((state) => state.catalogo);
-  const desbloqueadas = useGamificationStore((state) => state.desbloqueadas);
+  const streak = useGamificationStore((state) => state.streak);
+  const conquistas = useGamificationStore((state) => state.conquistas);
   const isLoading = useGamificationStore((state) => state.isLoading);
   const errorMessage = useGamificationStore((state) => state.errorMessage);
 
@@ -183,8 +147,8 @@ export function useGamification() {
     nivel,
     xpTotal,
     moedas,
-    catalogo,
-    desbloqueadas,
+    streak,
+    conquistas,
     isLoading,
     errorMessage,
     refreshGamification: loadGamification,

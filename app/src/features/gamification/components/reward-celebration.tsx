@@ -198,9 +198,7 @@ export function RewardCelebration({ event, hasFollowUp, onDone }: RewardCelebrat
   const nivel = event.nivelAtual;
   const nivelAnterior = event.nivelAnterior;
   const hasXp = recompensa.xp > 0;
-  const leveledUp = Boolean(nivel && nivelAnterior && nivel.atual > nivelAnterior.atual);
-  // A barra so anima quando a resposta traz o nivel; na API anterior ele chega pelo perfil.
-  const showLevelProgress = Boolean(nivel && event.conclusao.nivel);
+  const leveledUp = Boolean(nivelAnterior && nivel.atual > nivelAnterior.atual);
 
   const enter = useSharedValue(0);
   const medal = useSharedValue(0);
@@ -352,25 +350,23 @@ export function RewardCelebration({ event, hasFollowUp, onDone }: RewardCelebrat
               </Animated.View>
             )}
 
-            {showLevelProgress && nivel ? (
-              <Animated.View entering={FadeIn.delay(700).duration(300)} style={styles.levelBlock}>
-                <View style={styles.levelHeader}>
-                  <Text style={[styles.levelLabel, leveledUp ? styles.levelLabelUp : null]}>
-                    {leveledUp ? `Novo nível ${nivel.atual}!` : `Nível ${nivel.atual}`}
-                  </Text>
-                  <Text style={styles.levelHint}>faltam {nivel.xpParaProximo} XP</Text>
-                </View>
-                <AnimatedXpBar
-                  ratio={nivelRatio(nivel)}
-                  fromRatio={nivelAnterior ? nivelRatio(nivelAnterior) : undefined}
-                  levelKey={nivel.atual}
-                  fromLevelKey={nivelAnterior?.atual}
-                  delay={hasXp ? 1000 : 400}
-                  height={10}
-                  trackColor="rgba(255, 255, 255, 0.16)"
-                />
-              </Animated.View>
-            ) : null}
+            <Animated.View entering={FadeIn.delay(700).duration(300)} style={styles.levelBlock}>
+              <View style={styles.levelHeader}>
+                <Text style={[styles.levelLabel, leveledUp ? styles.levelLabelUp : null]}>
+                  {leveledUp ? `Novo nível ${nivel.atual}!` : `Nível ${nivel.atual}`}
+                </Text>
+                <Text style={styles.levelHint}>faltam {nivel.xpParaProximo} XP</Text>
+              </View>
+              <AnimatedXpBar
+                ratio={nivelRatio(nivel)}
+                fromRatio={nivelAnterior ? nivelRatio(nivelAnterior) : undefined}
+                levelKey={nivel.atual}
+                fromLevelKey={nivelAnterior?.atual}
+                delay={hasXp ? 1000 : 400}
+                height={10}
+                trackColor="rgba(255, 255, 255, 0.16)"
+              />
+            </Animated.View>
           </LinearGradient>
         </Pressable>
       </Animated.View>

@@ -14,6 +14,7 @@ import Animated, {
   withRepeat,
   withSequence,
   withSpring,
+  useReducedMotion,
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -58,6 +59,7 @@ export function LevelUpModal({ event, onDone }: LevelUpModalProps) {
   const glow = useSharedValue(0);
   const breathe = useSharedValue(0);
   const closingRef = useRef(false);
+  const reduceMotion = useReducedMotion();
 
   const [shownLevel, setShownLevel] = useState(event.de);
   const [cornerBurstKey, setCornerBurstKey] = useState(0);
@@ -97,7 +99,9 @@ export function LevelUpModal({ event, onDone }: LevelUpModalProps) {
     hapticImpact("heavy");
     backdrop.value = withTiming(1, { duration: 320 });
     medal.value = withDelay(160, withSpring(1, { damping: 7, stiffness: 110 }));
-    rays.value = withRepeat(withTiming(1, { duration: 16000, easing: Easing.linear }), -1, false);
+    if (!reduceMotion) {
+      rays.value = withRepeat(withTiming(1, { duration: 16000, easing: Easing.linear }), -1, false);
+    }
     glow.value = withRepeat(
       withSequence(
         withTiming(1, { duration: 1100, easing: Easing.inOut(Easing.sin) }),

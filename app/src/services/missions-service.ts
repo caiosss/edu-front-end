@@ -207,46 +207,8 @@ const normalizeNivel = (data: unknown): Nivel => {
   return { atual: Math.max(1, atual), xpNoNivel, xpParaProximo };
 };
 
-const LEGACY_XP_PATTERN = /(\d+)\s*XP/i;
-
-/**
- * API anterior a SPEC-002: a conclusao respondia so o texto "Parabéns! Você ganhou N XP!",
- * sem registro clinico nem nivel. Converte para o mesmo formato sem inventar o que o texto
- * nao diz — o nivel chega depois, pelo perfil.
- */
-const normalizeLegacyConclusao = (
-  message: string,
-  payload: CompleteMissionPayload
-): ConclusaoResponse => {
-  const xpMatch = message.match(LEGACY_XP_PATTERN);
-
-  return {
-    registro: {
-      tipo: payload.prescricaoItemId ? "DOSE" : "MISSAO",
-      horarioPrevisto: null,
-      horarioRegistrado: null,
-      dentroDaJanela: null,
-      progressoDoDia: null,
-    },
-    recompensa: {
-      xp: xpMatch ? Number.parseInt(xpMatch[1], 10) : 0,
-      regras: [],
-      motivo: null,
-      limiteAtingido: false,
-    },
-    nivel: null,
-  };
-};
-
-/** `ConclusaoResponseDTO { registro, recompensa, nivel }`, ou o texto da API anterior. */
-const normalizeConclusaoResponse = (
-  data: unknown,
-  payload: CompleteMissionPayload
-): ConclusaoResponse => {
-  if (typeof data === "string") {
-    return normalizeLegacyConclusao(data, payload);
-  }
-
+/** `ConclusaoResponseDTO { registro, recompensa, nivel }` */
+const normalizeConclusaoResponse = (data: unknown): ConclusaoResponse => {
   const parsedData = asObject(data);
 
   if (!parsedData) {
@@ -256,10 +218,7 @@ const normalizeConclusaoResponse = (
   return {
     registro: normalizeRegistro(parsedData.registro),
     recompensa: normalizeRecompensa(parsedData.recompensa),
-    nivel:
-      parsedData.nivel === undefined || parsedData.nivel === null
-        ? null
-        : normalizeNivel(parsedData.nivel),
+    nivel: normalizeNivel(parsedData.nivel),
   };
 };
 
@@ -271,12 +230,8 @@ export const fetchMyMissions = async (): Promise<MyMissionsResponse> => {
   }
 
   try {
-    // A API anterior a SPEC-003 exige `pacienteId`; a atual tira o paciente do token e
-    // ignora o parametro. Enviar sempre atende as duas.
-    const pacienteId = await resolveCurrentPatientId();
-    const response = await api.get("/missoes/minhas", {
-      params: { pacienteId },
-    });
+    // O paciente vem do token: o backend nao aceita `pacienteId` aqui (SPEC-003 §1.1).
+    const response = await api.get("/missoes/minhas");
     return normalizeMyMissionsResponse(response.data);
   } catch (error) {
     if (axios.isAxiosError(error)) {
@@ -340,7 +295,7 @@ export const completeMission = async (
       { pacienteId, planoMissaoItemId, prescricaoItemId },
       { headers: { "Idempotency-Key": idempotencyKey } }
     );
-    return normalizeConclusaoResponse(response.data, payload);
+    return normalizeConclusaoResponse(response.data);
   } catch (error) {
     if (axios.isAxiosError(error)) {
       const status = error.response?.status;

@@ -1,6 +1,4 @@
 import axios from "axios";
-import type { Nivel } from "../features/gamification/types";
-import { nivelFromLegacyProfile } from "../features/gamification/utils/level";
 import type { PatientProfileResponse } from "../features/profile/types";
 import { useAuthStore } from "../store/auth-store";
 import { getPacienteIdFromToken } from "../utils/jwt";
@@ -8,14 +6,6 @@ import { api } from "./api";
 
 const asNonEmptyString = (value: unknown): string | null => {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
-};
-
-const asNonNegativeNumber = (value: unknown): number | null => {
-  if (typeof value !== "number" || Number.isNaN(value) || value < 0) {
-    return null;
-  }
-
-  return value;
 };
 
 const asStringArray = (value: unknown): string[] => {
@@ -30,35 +20,9 @@ const asStringArray = (value: unknown): string[] => {
 };
 
 /**
- * Ha dois formatos de progresso em uso: o da SPEC-002 (`xpTotal`, `xpNoNivel`,
- * `xpParaProximo`) e o anterior, com `xpAtual` residual do nivel. Aceita os dois.
+ * `PacienteResponseDTO`. XP, nivel e moedas ainda vem neste endpoint, mas sao legado em
+ * coexistencia (SPEC-004 §5.6): o progresso e lido de `/gamification/perfil`.
  */
-const resolveProfileProgress = (data: {
-  nivel?: unknown;
-  xpAtual?: unknown;
-  xpTotal?: unknown;
-  xpNoNivel?: unknown;
-  xpParaProximo?: unknown;
-}): { nivel: Nivel; xpTotal: number } | null => {
-  const nivel = asNonNegativeNumber(data.nivel);
-
-  if (nivel === null) {
-    return null;
-  }
-
-  const xpTotal = asNonNegativeNumber(data.xpTotal);
-  const xpNoNivel = asNonNegativeNumber(data.xpNoNivel);
-  const xpParaProximo = asNonNegativeNumber(data.xpParaProximo);
-
-  if (xpTotal !== null && xpNoNivel !== null && xpParaProximo !== null) {
-    return { nivel: { atual: Math.max(1, nivel), xpNoNivel, xpParaProximo }, xpTotal };
-  }
-
-  const xpAtual = asNonNegativeNumber(data.xpAtual);
-
-  return xpAtual === null ? null : nivelFromLegacyProfile(nivel, xpAtual);
-};
-
 const normalizePatientProfileResponse = (data: unknown): PatientProfileResponse => {
   if (!data || typeof data !== "object") {
     throw new Error("Resposta de paciente invalida.");
@@ -67,45 +31,25 @@ const normalizePatientProfileResponse = (data: unknown): PatientProfileResponse 
   const parsedData = data as {
     id?: unknown;
     dataTransplante?: unknown;
-    moedas?: unknown;
-    nivel?: unknown;
     nomeCompleto?: unknown;
     nomeCuidadores?: unknown;
     cuidadores?: unknown;
     tipoTransplante?: unknown;
-    xpAtual?: unknown;
-    xpTotal?: unknown;
-    xpNoNivel?: unknown;
-    xpParaProximo?: unknown;
   };
 
   const id = asNonEmptyString(parsedData.id);
   const nomeCompleto = asNonEmptyString(parsedData.nomeCompleto);
-  const moedas = asNonNegativeNumber(parsedData.moedas);
-  const progress = resolveProfileProgress(parsedData);
-  const nomeCuidadores = asStringArray(
-    parsedData.cuidadores ?? parsedData.nomeCuidadores
-  );
 
   if (!id || !nomeCompleto) {
     throw new Error("Resposta de paciente invalida.");
   }
 
-  if (!progress) {
-    throw new Error("Resposta de paciente invalida: progresso ausente.");
-  }
-
   return {
     id,
     dataTransplante: asNonEmptyString(parsedData.dataTransplante) ?? "",
-    moedas: moedas ?? 0,
-    nivel: progress.nivel.atual,
     nomeCompleto,
-    nomeCuidadores,
+    nomeCuidadores: asStringArray(parsedData.cuidadores ?? parsedData.nomeCuidadores),
     tipoTransplante: asNonEmptyString(parsedData.tipoTransplante) ?? "",
-    xpTotal: progress.xpTotal,
-    xpNoNivel: progress.nivel.xpNoNivel,
-    xpParaProximo: progress.nivel.xpParaProximo,
   };
 };
 
@@ -177,8 +121,8 @@ export const fetchCurrentPatientId = async (): Promise<string> => {
 let cachedPatientId: { token: string; pacienteId: string } | null = null;
 
 /**
- * Id do paciente da sessao. O token so traz a claim `pacienteId` a partir da SPEC-003; com a
- * API anterior, o id vem de `/pacientes/me` e fica guardado enquanto o token for o mesmo.
+ * Id do paciente da sessao: a claim `pacienteId` do token (SPEC-003 §5.1) ou, sem ela,
+ * `/pacientes/me`, guardado enquanto o token for o mesmo.
  */
 export const resolveCurrentPatientId = async (): Promise<string> => {
   const token = useAuthStore.getState().token;

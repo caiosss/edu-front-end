@@ -8,6 +8,7 @@ import Animated, {
   withDelay,
   withRepeat,
   withSequence,
+  useReducedMotion,
   withTiming,
 } from "react-native-reanimated";
 
@@ -30,6 +31,7 @@ export function Sparkle({
   color = "#FFE8A3",
 }: SparkleProps) {
   const twinkle = useSharedValue(0);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
     twinkle.value = withDelay(
@@ -53,6 +55,10 @@ export function Sparkle({
     opacity: twinkle.value,
     transform: [{ scale: 0.3 + twinkle.value * 0.9 }, { rotate: `${twinkle.value * 90}deg` }],
   }));
+
+  if (reduceMotion) {
+    return null;
+  }
 
   const armThickness = Math.max(2, size * 0.2);
 
