@@ -40,3 +40,7 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Credenciais de assinatura do Android (o EAS guarda a chave; nada disso vai para o git)
+*.keystore
+credentials.json
