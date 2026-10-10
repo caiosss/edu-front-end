@@ -159,4 +159,6 @@ export type CelebrationEvent =
       id: string;
       kind: "achievement";
       conquista: Conquista;
+      /** Outras conquistas destravadas junto: viram uma frase no mesmo modal, nao um modal cada. */
+      outras: number;
     };

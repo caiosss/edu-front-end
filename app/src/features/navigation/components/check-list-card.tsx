@@ -45,7 +45,7 @@ function ChecklistNotice({ notice }: { notice: ChecklistItemNotice }) {
 
   return (
     <View style={styles.noticeRow}>
-      <AlertTriangle size={12} color={isDanger ? "#C92A2A" : "#4F6982"} />
+      <AlertTriangle size={18} color={isDanger ? "#C92A2A" : "#4F6982"} />
       <Text style={[styles.noticeText, isDanger ? styles.noticeTextDanger : null]}>
         {notice.message}
       </Text>
@@ -126,7 +126,7 @@ export default function ChecklistCard({
                     ]}
                   >
                     {isChecked ? <CheckRipple /> : null}
-                    <ItemIcon size={15} color={iconColor} />
+                    <ItemIcon size={24} color={iconColor} />
                   </View>
                   <View style={styles.checklistTextBlock}>
                     <Text style={styles.checklistTitle}>{item.title}</Text>
@@ -139,15 +139,15 @@ export default function ChecklistCard({
 
                 <View style={styles.checklistRight}>
                   {isLoading ? (
-                    <ActivityIndicator size="small" color="#1A6FD6" />
+                    <ActivityIndicator size="large" color="#1A6FD6" />
                   ) : isChecked ? (
                     <Animated.View entering={ZoomIn.springify().damping(7)}>
-                      <CircleCheck size={18} color="#1A6FD6" />
+                      <CircleCheck size={30} color="#1A6FD6" />
                     </Animated.View>
                   ) : isDanger ? (
-                    <Circle size={18} color="#C92A2A" />
+                    <Circle size={30} color="#C92A2A" />
                   ) : (
-                    <Circle size={18} color="#7D94AB" />
+                    <Circle size={30} color="#7D94AB" />
                   )}
                   <Text
                     style={[
@@ -181,7 +181,8 @@ const styles = StyleSheet.create({
     color: "#12314C",
   },
   h2: {
-    fontSize: 20,
+    fontSize: 22,
+    lineHeight: 28,
     fontWeight: "700",
     color: "#12314C",
   },
@@ -212,7 +213,7 @@ const styles = StyleSheet.create({
   },
   card: {
     borderRadius: 18,
-    padding: 16,
+    padding: 18,
     backgroundColor: "#FDFEFF",
     shadowColor: "#173B5D",
     shadowOpacity: 0.07,
@@ -227,20 +228,20 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   info: {
-    fontSize: 14,
+    fontSize: 18,
     color: "#35506B",
-    lineHeight: 20,
+    lineHeight: 26,
   },
   checklistGroup: {
-    gap: 8,
+    gap: 10,
   },
   checklistRow: {
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "transparent",
-    minHeight: 58,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    minHeight: 80,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     backgroundColor: "#F4F8FC",
     flexDirection: "row",
     alignItems: "center",
@@ -260,13 +261,13 @@ const styles = StyleSheet.create({
   checklistLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
     flex: 1,
   },
   iconBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#DFEAF5",
@@ -276,9 +277,9 @@ const styles = StyleSheet.create({
   },
   checkRipple: {
     position: "absolute",
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     borderWidth: 2,
     borderColor: "#4DABF7",
   },
@@ -291,40 +292,43 @@ const styles = StyleSheet.create({
   },
   checklistTitle: {
     color: "#14324C",
-    fontSize: 14,
-    fontWeight: "600",
+    fontSize: 19,
+    lineHeight: 25,
+    fontWeight: "700",
   },
   checklistSubtitle: {
-    color: "#5B738A",
-    fontSize: 12,
+    color: "#48627A",
+    fontSize: 16,
+    lineHeight: 22,
   },
   noticeRow: {
-    marginTop: 3,
+    marginTop: 4,
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 6,
   },
   noticeText: {
     flex: 1,
     color: "#4F6982",
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 16,
+    lineHeight: 22,
   },
   noticeTextDanger: {
     color: "#C92A2A",
-    fontWeight: "600",
+    fontWeight: "700",
   },
   checklistRight: {
     alignItems: "center",
     justifyContent: "center",
-    minWidth: 98,
-    gap: 2,
+    minWidth: 92,
+    gap: 4,
   },
   checkActionLabel: {
-    fontSize: 11,
-    color: "#5B738A",
+    fontSize: 16,
+    color: "#48627A",
+    fontWeight: "600",
     textAlign: "center",
-    lineHeight: 14,
+    lineHeight: 20,
   },
   checkActionLabelDone: {
     color: "#1A6FD6",

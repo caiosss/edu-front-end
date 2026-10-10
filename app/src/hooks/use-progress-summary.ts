@@ -3,6 +3,7 @@ import type { PeriodoResumo, ResumoProgresso } from "../features/gamification/ty
 import { fetchProgressSummary } from "../services/gamification-service";
 import { useAuthStore } from "../store/auth-store";
 import { useGamificationStore } from "../store/gamification-store";
+import { toFriendlyMessage } from "../utils/friendly-error";
 
 type CachedSummary = {
   token: string;
@@ -77,7 +78,7 @@ export function useProgressSummary(
       });
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Nao foi possivel carregar seu progresso."
+        toFriendlyMessage(error, "Não foi possível carregar o seu progresso.")
       );
     } finally {
       setIsLoading(false);

@@ -210,7 +210,7 @@ export function MultipleChoiceRound({ rodada, onFinish, onExit }: MultipleChoice
           hitSlop={10}
           style={styles.exitButton}
         >
-          <X size={22} color="#35506B" />
+          <X size={26} color="#35506B" />
         </Pressable>
         <View style={styles.headerProgress}>
           <Text style={styles.progressLabel}>
@@ -283,7 +283,7 @@ export function MultipleChoiceRound({ rodada, onFinish, onExit }: MultipleChoice
         <ConfettiBurst
           burstKey={burstKey}
           origin={{ x: width / 2, y: 240 }}
-          count={26}
+          count={14}
           colors={ACERTO_COLORS}
           spread={360}
           power={ACERTO_POWER}
@@ -308,8 +308,8 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   exitButton: {
-    width: 44,
-    height: 44,
+    width: 52,
+    height: 52,
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
   },
   progressLabel: {
     color: "#35506B",
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: "700",
   },
   content: {
@@ -352,19 +352,19 @@ const styles = StyleSheet.create({
   },
   reviewText: {
     color: "#5F3DC4",
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: "800",
   },
   medication: {
     color: "#1A5DB5",
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: "800",
   },
   enunciado: {
     color: "#12314C",
-    fontSize: 21,
+    fontSize: 23,
     fontWeight: "800",
-    lineHeight: 28,
+    lineHeight: 31,
   },
   options: {
     gap: 10,
@@ -393,8 +393,8 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   letter: {
-    width: 32,
-    height: 32,
+    width: 40,
+    height: 40,
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
   },
   letterText: {
     color: "#1A5DB5",
-    fontSize: 14,
+    fontSize: 17,
     fontWeight: "900",
   },
   letterTextChosen: {
@@ -417,12 +417,12 @@ const styles = StyleSheet.create({
   optionText: {
     flex: 1,
     color: "#12314C",
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: "700",
   },
   chosenTag: {
     color: "#495057",
-    fontSize: 11,
+    fontSize: 15,
     fontWeight: "700",
   },
   feedback: {
@@ -440,9 +440,9 @@ const styles = StyleSheet.create({
   },
   feedbackText: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "700",
-    lineHeight: 22,
+    lineHeight: 25,
   },
   feedbackTextGood: {
     color: "#0B5E3B",
@@ -456,7 +456,7 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
   },
   nextButton: {
-    minHeight: 54,
+    minHeight: 56,
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
@@ -470,7 +470,7 @@ const styles = StyleSheet.create({
   },
   nextText: {
     color: "#FFFFFF",
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: "800",
   },
 });

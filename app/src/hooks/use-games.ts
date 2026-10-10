@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { RodadaResumo, SituacaoJogo } from "../features/games/types";
 import { fetchAvailableGames, fetchRoundHistory } from "../services/games-service";
+import { toFriendlyMessage } from "../utils/friendly-error";
 
 type UseGamesLobbyResult = {
   jogos: SituacaoJogo[];
@@ -34,9 +35,7 @@ export function useGamesLobby(enabled: boolean): UseGamesLobbyResult {
       setJogos(disponiveis.value);
     } else {
       setErrorMessage(
-        disponiveis.reason instanceof Error
-          ? disponiveis.reason.message
-          : "Nao foi possivel carregar os jogos."
+        toFriendlyMessage(disponiveis.reason, "Não foi possível carregar os jogos.")
       );
     }
 

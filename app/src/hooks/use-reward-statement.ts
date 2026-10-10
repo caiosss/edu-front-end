@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ExtratoLinha } from "../features/gamification/types";
 import { fetchRewardStatement } from "../services/gamification-service";
+import { toFriendlyMessage } from "../utils/friendly-error";
 
 type UseRewardStatementResult = {
   linhas: ExtratoLinha[];
@@ -44,7 +45,7 @@ export function useRewardStatement(enabled: boolean): UseRewardStatementResult {
     } catch (error) {
       if (requestId === requestRef.current) {
         setErrorMessage(
-          error instanceof Error ? error.message : "Nao foi possivel carregar o extrato."
+          toFriendlyMessage(error, "Não foi possível carregar o histórico de recompensas.")
         );
       }
     } finally {
@@ -74,7 +75,7 @@ export function useRewardStatement(enabled: boolean): UseRewardStatementResult {
       nextPageRef.current = pagina.pagina + 1;
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Nao foi possivel carregar o extrato."
+        toFriendlyMessage(error, "Não foi possível carregar o histórico de recompensas.")
       );
     } finally {
       setIsLoadingMore(false);

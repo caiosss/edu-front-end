@@ -32,7 +32,7 @@ const formatDate = (value: string): string => {
   const parsedDate = parseDate(value);
 
   if (!parsedDate) {
-    return "Nao informado";
+    return "Não informado";
   }
 
   return new Intl.DateTimeFormat("pt-BR", {
@@ -102,7 +102,7 @@ export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScree
     () =>
       accessibilityEnabled
         ? "Contraste elevado e apoio visual habilitados."
-        : "Ative para melhorar leitura e navegacao.",
+        : "Ative para deixar a leitura e a navegação mais fáceis.",
     [accessibilityEnabled]
   );
 
@@ -140,7 +140,7 @@ export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScree
             <Text style={styles.mainName}>{caregiverProfile.nomeCompleto}</Text>
 
             <View style={styles.metaGroup}>
-              <ProfileInfoRow label="Relacao" value={caregiverProfile.relacao} />
+              <ProfileInfoRow label="Parentesco" value={caregiverProfile.relacao} />
               <ProfileInfoRow label="Telefone" value={caregiverProfile.telefone} />
             </View>
           </Animated.View>
@@ -177,7 +177,7 @@ export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScree
             <View style={styles.metaGroup}>
               <ProfileInfoRow
                 label="Tipo do transplante"
-                value={patientProfile.tipoTransplante || "Nao informado"}
+                value={patientProfile.tipoTransplante || "Não informado"}
               />
               <ProfileInfoRow
                 label="Data do transplante"
@@ -264,21 +264,21 @@ export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScree
         <View style={styles.cardHeader}>
           <View style={styles.headerLeft}>
             <Settings size={18} color="#2C7BE5" />
-            <Text style={styles.cardTitle}>Configuracoes</Text>
+            <Text style={styles.cardTitle}>Configurações</Text>
           </View>
         </View>
 
         <View style={styles.settingsGroup}>
           <SettingItem
-            label="Preferencias de notificacao"
-            description="Receba lembretes sobre medicamentos e missoes."
+            label="Preferências de notificação"
+            description="Receba lembretes sobre medicamentos e missões."
             value={notificationsEnabled}
             onValueChange={setNotificationsEnabled}
             Icon={Bell}
           />
 
           <SettingItem
-            label="Configuracoes de acessibilidade"
+            label="Configurações de acessibilidade"
             description={accessibilityDescription}
             value={accessibilityEnabled}
             onValueChange={setAccessibilityEnabled}

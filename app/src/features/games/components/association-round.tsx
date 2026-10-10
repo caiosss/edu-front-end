@@ -145,7 +145,7 @@ export function AssociationRound({ rodada, onFinish, onExit }: AssociationRoundP
           hitSlop={10}
           style={styles.exitButton}
         >
-          <X size={22} color="#35506B" />
+          <X size={26} color="#35506B" />
         </Pressable>
         <View style={styles.headerProgress}>
           <Text style={styles.progressLabel}>
@@ -300,7 +300,7 @@ export function AssociationRound({ rodada, onFinish, onExit }: AssociationRoundP
         <ConfettiBurst
           burstKey={burstKey}
           origin={{ x: width / 2, y: 200 }}
-          count={22}
+          count={12}
           colors={LIGADO_COLORS}
           spread={360}
           power={LIGADO_POWER}
@@ -325,8 +325,8 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   exitButton: {
-    width: 44,
-    height: 44,
+    width: 52,
+    height: 52,
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
@@ -338,7 +338,7 @@ const styles = StyleSheet.create({
   },
   progressLabel: {
     color: "#35506B",
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: "700",
   },
   content: {
@@ -348,9 +348,9 @@ const styles = StyleSheet.create({
   },
   instruction: {
     color: "#12314C",
-    fontSize: 19,
+    fontSize: 21,
     fontWeight: "800",
-    lineHeight: 26,
+    lineHeight: 29,
     paddingHorizontal: 4,
   },
   columns: {
@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
   },
   columnTitle: {
     color: "#4F6982",
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: "800",
     letterSpacing: 0.8,
     textTransform: "uppercase",
@@ -385,7 +385,7 @@ const styles = StyleSheet.create({
   },
   medName: {
     color: "#12314C",
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "800",
   },
   statusRow: {
@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     flex: 1,
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: "700",
   },
   answerItem: {
@@ -421,7 +421,7 @@ const styles = StyleSheet.create({
   answerText: {
     flex: 1,
     color: "#23405C",
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: "700",
   },
   pairDot: {
@@ -444,9 +444,9 @@ const styles = StyleSheet.create({
   },
   feedbackText: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "700",
-    lineHeight: 22,
+    lineHeight: 25,
   },
   feedbackTextGood: {
     color: "#0B5E3B",
@@ -460,7 +460,7 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
   },
   nextButton: {
-    minHeight: 54,
+    minHeight: 56,
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
@@ -474,7 +474,7 @@ const styles = StyleSheet.create({
   },
   nextText: {
     color: "#FFFFFF",
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: "800",
   },
 });

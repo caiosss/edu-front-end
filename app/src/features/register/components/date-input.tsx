@@ -27,18 +27,19 @@ try {
   NativeDateTimePicker = null;
 }
 
-const maskIsoDateInput = (input: string): string => {
+/** "03101950" -> "03/10/1950". A validacao e o envio ja aceitam DD/MM/AAAA. */
+const maskBrDateInput = (input: string): string => {
   const digits = input.replace(/\D/g, "").slice(0, 8);
 
-  if (digits.length <= 4) {
+  if (digits.length <= 2) {
     return digits;
   }
 
-  if (digits.length <= 6) {
-    return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+  if (digits.length <= 4) {
+    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
   }
 
-  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4, 8)}`;
 };
 
 type DateInputProps = {
@@ -71,8 +72,8 @@ export function DateInput({
               <Text style={styles.label}>{label}</Text>
               <TextInput
                 value={value}
-                onChangeText={(text) => onChange(maskIsoDateInput(text))}
-                placeholder="AAAA-MM-DD"
+                onChangeText={(text) => onChange(maskBrDateInput(text))}
+                placeholder="DD/MM/AAAA"
                 keyboardType="number-pad"
                 maxLength={10}
                 style={[styles.manualInput, error ? styles.dateButtonError : undefined]}
@@ -146,12 +147,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   label: {
-    fontSize: 14,
+    fontSize: 17,
     fontWeight: "600",
     color: "#12314C",
   },
   dateButton: {
-    minHeight: 52,
+    minHeight: 60,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: "#D5DEE8",
@@ -164,21 +165,21 @@ const styles = StyleSheet.create({
   },
   datePlaceholder: {
     color: "#8E9AA7",
-    fontSize: 16,
+    fontSize: 18,
   },
   dateValue: {
     color: "#1B2F43",
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "500",
   },
   manualInput: {
-    minHeight: 52,
+    minHeight: 60,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: "#D5DEE8",
     backgroundColor: "#FFFFFF",
     paddingHorizontal: 14,
-    fontSize: 16,
+    fontSize: 18,
     color: "#1B2F43",
   },
   pickerContainer: {
@@ -200,12 +201,12 @@ const styles = StyleSheet.create({
   },
   fallbackHint: {
     color: "#6C7D8E",
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 16,
+    lineHeight: 21,
   },
   errorText: {
     color: "#D64545",
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: "500",
   },
 });

@@ -20,12 +20,15 @@ import Animated, {
 } from "react-native-reanimated";
 import { useForm } from "react-hook-form";
 import { FormInput } from "../features/register/components/form-input";
+import { PasswordRules } from "../features/register/components/password-rules";
 import { ProgressIndicator } from "../features/register/components/progress-indicator";
 import { buildRegisterPayload } from "../features/register/payload";
 import { useRegistrationStore } from "../features/register/store/use-registration-store";
 import type { RegistrationFormValues } from "../features/register/types";
 import { registrationSchema } from "../features/register/validation";
 import { registerUser } from "../services/registration-service";
+import { Logo } from "../components/ui";
+import { toFriendlyMessage } from "../utils/friendly-error";
 
 type TransitionDirection = "forward" | "backward";
 type FeedbackState = "idle" | "success" | "error";
@@ -101,7 +104,8 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
     reValidateMode: "onChange",
   });
 
-  const stepLabels = useMemo(() => ["Credenciais", "Dados do paciente"], []);
+  const stepLabels = useMemo(() => ["Dados de acesso", "Dados do paciente"], []);
+  const senha = watch("senha") ?? "";
   const containerWidth = useMemo(() => Math.min(width - 24, 540), [width]);
 
   useEffect(() => {
@@ -151,7 +155,7 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
     try {
       await registerUser(payload);
       setFeedbackState("success");
-      setFeedbackMessage("Cadastro finalizado com sucesso.");
+      setFeedbackMessage("Cadastro concluído! Agora é só entrar.");
       reset();
       setTimeout(() => {
         onNavigateToLogin?.();
@@ -159,9 +163,7 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
     } catch (error) {
       setFeedbackState("error");
       setFeedbackMessage(
-        error instanceof Error
-          ? error.message
-          : "Nao foi possivel finalizar o cadastro no momento. Tente novamente."
+        toFriendlyMessage(error, "Não foi possível concluir o cadastro agora. Tente de novo.")
       );
     }
   };
@@ -198,7 +200,7 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
         control={control}
         name="pacienteNomeCompleto"
         label="Nome completo"
-        placeholder="Ex: Maria Silva"
+        placeholder="Ex.: Maria Silva"
         autoCapitalize="words"
       />
       <FormInput
@@ -214,7 +216,7 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
         control={control}
         name="pacienteTipoTransplante"
         label="Tipo de transplante"
-        placeholder="Ex: Rim"
+        placeholder="Ex.: rim"
         autoCapitalize="words"
       />
       <FormInput
@@ -249,6 +251,7 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
             isPassword
             autoCapitalize="none"
           />
+          <PasswordRules value={senha} />
         </View>
       );
     }
@@ -266,13 +269,14 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
           contentContainerStyle={styles.scrollContainer}
           keyboardShouldPersistTaps="handled"
         >
+          <Logo width={160} style={styles.logo} />
           <Animated.View
             entering={FadeInDown.duration(320)}
             style={[styles.card, { width: containerWidth }]}
           >
             <Text style={styles.pageTitle}>Cadastro</Text>
             <Text style={styles.pageDescription}>
-              Fluxo guiado de registro do paciente.
+              Preencha os seus dados em 2 etapas.
             </Text>
 
             <ProgressIndicator
@@ -284,8 +288,8 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
             <View style={styles.stepHeader}>
               <Text style={styles.stepTitle}>
                 {currentStep === 0
-                  ? "Etapa 1 - Credenciais"
-                  : "Etapa 2 - Dados do paciente"}
+                  ? "Etapa 1 de 2: dados de acesso"
+                  : "Etapa 2 de 2: dados do paciente"}
               </Text>
             </View>
 
@@ -347,7 +351,7 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
                   style={[styles.actionButton, styles.primaryButton]}
                   disabled={isSubmitting}
                 >
-                  <Text style={[styles.actionText, styles.primaryButtonText]}>Proximo</Text>
+                  <Text style={[styles.actionText, styles.primaryButtonText]}>Próximo</Text>
                 </Pressable>
               ) : (
                 <Pressable
@@ -368,7 +372,7 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
                 style={styles.switchAuthAction}
                 disabled={isSubmitting || feedbackState === "success"}
               >
-                <Text style={styles.switchAuthText}>Ja possui conta? Entrar</Text>
+                <Text style={styles.switchAuthText}>Já tem conta? Entrar</Text>
               </Pressable>
             ) : null}
           </Animated.View>
@@ -385,6 +389,9 @@ const styles = StyleSheet.create({
   },
   keyboardView: {
     flex: 1,
+  },
+  logo: {
+    marginBottom: 16,
   },
   scrollContainer: {
     flexGrow: 1,
@@ -414,15 +421,15 @@ const styles = StyleSheet.create({
   },
   pageDescription: {
     color: "#48627A",
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 17,
+    lineHeight: 24,
   },
   stepHeader: {
     paddingVertical: 4,
   },
   stepTitle: {
     color: "#12314C",
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "700",
   },
   stepContainer: {
@@ -446,7 +453,7 @@ const styles = StyleSheet.create({
   },
   feedbackText: {
     fontWeight: "600",
-    fontSize: 13,
+    fontSize: 16,
   },
   feedbackTextSuccess: {
     color: "#1F6B38",
@@ -464,7 +471,7 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
-    minHeight: 50,
+    minHeight: 56,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
@@ -478,7 +485,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F9FBFE",
   },
   actionText: {
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: "700",
   },
   primaryButtonText: {
@@ -491,11 +498,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 40,
+    minHeight: 56,
   },
   switchAuthText: {
     color: "#2C7BE5",
-    fontSize: 14,
+    fontSize: 17,
     fontWeight: "700",
   },
 });

@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { useForm } from "react-hook-form";
+import { Logo } from "../components/ui";
 import { AnimatedActionButton } from "../features/login/components/animated-action-button";
 import { LoginInput } from "../features/login/components/login-input";
 import { useLoginController } from "../features/login/hooks/use-login-controller";
@@ -59,6 +60,7 @@ export default function LoginScreen({ onNavigateToRegister }: LoginScreenProps) 
           contentContainerStyle={styles.scrollContainer}
           keyboardShouldPersistTaps="handled"
         >
+          <Logo width={180} style={styles.logo} />
           <Animated.View
             entering={FadeInDown.duration(320)}
             style={[styles.card, { width: containerWidth }]}
@@ -145,6 +147,9 @@ const styles = StyleSheet.create({
   keyboardView: {
     flex: 1,
   },
+  logo: {
+    marginBottom: 20,
+  },
   scrollContainer: {
     flexGrow: 1,
     alignItems: "center",
@@ -173,8 +178,8 @@ const styles = StyleSheet.create({
   },
   pageDescription: {
     color: "#48627A",
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 17,
+    lineHeight: 24,
   },
   formGroup: {
     gap: 14,
@@ -194,7 +199,7 @@ const styles = StyleSheet.create({
   },
   feedbackText: {
     fontWeight: "600",
-    fontSize: 13,
+    fontSize: 16,
   },
   feedbackTextSuccess: {
     color: "#1F6B38",
@@ -210,11 +215,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 42,
+    minHeight: 56,
   },
   switchAuthText: {
     color: "#2C7BE5",
-    fontSize: 14,
+    fontSize: 17,
     fontWeight: "700",
   },
 });

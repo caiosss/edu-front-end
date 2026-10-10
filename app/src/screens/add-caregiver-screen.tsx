@@ -19,6 +19,7 @@ import { buildRegisterPayload } from "../features/register/payload";
 import { useRegistrationStore } from "../features/register/store/use-registration-store";
 import type { RegistrationFormValues, UserType } from "../features/register/types";
 import { registerCaregiverAndCreateLink } from "../services/registration-service";
+import { toFriendlyMessage } from "../utils/friendly-error";
 
 type FeedbackState = "idle" | "success" | "error";
 
@@ -93,13 +94,13 @@ export default function AddCaregiverScreen({ onNavigateBack }: AddCaregiverScree
     if (!values.email.trim()) {
       setError("email", {
         type: "manual",
-        message: "Campo obrigatorio.",
+        message: "Preencha este campo.",
       });
       isValid = false;
     } else if (!isValidEmail(values.email)) {
       setError("email", {
         type: "manual",
-        message: "Informe um e-mail valido.",
+        message: "Informe um e-mail válido.",
       });
       isValid = false;
     }
@@ -107,7 +108,7 @@ export default function AddCaregiverScreen({ onNavigateBack }: AddCaregiverScree
     if (values.senha.length < 8) {
       setError("senha", {
         type: "manual",
-        message: "A senha deve ter no minimo 8 caracteres.",
+        message: "A senha precisa ter pelo menos 8 caracteres.",
       });
       isValid = false;
     } else if (
@@ -117,7 +118,7 @@ export default function AddCaregiverScreen({ onNavigateBack }: AddCaregiverScree
     ) {
       setError("senha", {
         type: "manual",
-        message: "Use letras maiusculas, minusculas e ao menos 1 numero.",
+        message: "Use letras maiúsculas, minúsculas e pelo menos 1 número.",
       });
       isValid = false;
     }
@@ -125,7 +126,7 @@ export default function AddCaregiverScreen({ onNavigateBack }: AddCaregiverScree
     if (cpfDigits.length !== 11) {
       setError("pacienteCpf", {
         type: "manual",
-        message: "Informe um CPF valido com 11 digitos.",
+        message: "Informe um CPF válido, com 11 dígitos.",
       });
       isValid = false;
     }
@@ -133,7 +134,7 @@ export default function AddCaregiverScreen({ onNavigateBack }: AddCaregiverScree
     if (!values.pacienteNomeCompleto.trim()) {
       setError("pacienteNomeCompleto", {
         type: "manual",
-        message: "Campo obrigatorio.",
+        message: "Preencha este campo.",
       });
       isValid = false;
     }
@@ -141,7 +142,7 @@ export default function AddCaregiverScreen({ onNavigateBack }: AddCaregiverScree
     if (!values.cuidadorNomeCompleto.trim()) {
       setError("cuidadorNomeCompleto", {
         type: "manual",
-        message: "Campo obrigatorio.",
+        message: "Preencha este campo.",
       });
       isValid = false;
     }
@@ -149,7 +150,7 @@ export default function AddCaregiverScreen({ onNavigateBack }: AddCaregiverScree
     if (!values.cuidadorRelacao.trim()) {
       setError("cuidadorRelacao", {
         type: "manual",
-        message: "Campo obrigatorio.",
+        message: "Preencha este campo.",
       });
       isValid = false;
     }
@@ -158,13 +159,13 @@ export default function AddCaregiverScreen({ onNavigateBack }: AddCaregiverScree
     if (!values.cuidadorTelefone.trim()) {
       setError("cuidadorTelefone", {
         type: "manual",
-        message: "Campo obrigatorio.",
+        message: "Preencha este campo.",
       });
       isValid = false;
     } else if (phoneDigits.length < 10 || phoneDigits.length > 11) {
       setError("cuidadorTelefone", {
         type: "manual",
-        message: "Informe um telefone valido com DDD.",
+        message: "Informe um telefone válido, com DDD.",
       });
       isValid = false;
     }
@@ -195,7 +196,7 @@ export default function AddCaregiverScreen({ onNavigateBack }: AddCaregiverScree
 
       setFeedbackState("success");
       setFeedbackMessage(
-        "Cuidador cadastrado e vinculo solicitado. Compartilhe a senha temporaria com o cuidador."
+        "Cuidador cadastrado. Agora envie a senha temporária para essa pessoa."
       );
 
       setValue("email", "", { shouldDirty: false, shouldValidate: false });
@@ -207,9 +208,7 @@ export default function AddCaregiverScreen({ onNavigateBack }: AddCaregiverScree
     } catch (error) {
       setFeedbackState("error");
       setFeedbackMessage(
-        error instanceof Error
-          ? error.message
-          : "Nao foi possivel cadastrar o cuidador no momento."
+        toFriendlyMessage(error, "Não foi possível cadastrar o cuidador agora. Tente de novo.")
       );
     }
   };
@@ -256,8 +255,8 @@ export default function AddCaregiverScreen({ onNavigateBack }: AddCaregiverScree
             <FormInput
               control={control}
               name="senha"
-              label="Senha temporaria do cuidador"
-              placeholder="Minimo de 8 caracteres"
+              label="Senha temporária do cuidador"
+              placeholder="Mínimo de 8 caracteres"
               isPassword
               autoCapitalize="none"
             />
@@ -359,15 +358,15 @@ const styles = StyleSheet.create({
   },
   pageTitle: {
     color: "#12314C",
-    fontSize: 21,
+    fontSize: 23,
     fontWeight: "700",
     flex: 1,
     textAlign: "center",
   },
   pageDescription: {
     color: "#48627A",
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 17,
+    lineHeight: 24,
   },
   feedbackBox: {
     borderRadius: 12,
@@ -384,7 +383,7 @@ const styles = StyleSheet.create({
   },
   feedbackText: {
     fontWeight: "600",
-    fontSize: 13,
+    fontSize: 16,
   },
   feedbackTextSuccess: {
     color: "#1F6B38",
@@ -393,7 +392,7 @@ const styles = StyleSheet.create({
     color: "#9B2F2F",
   },
   saveButton: {
-    minHeight: 50,
+    minHeight: 56,
     borderRadius: 12,
     backgroundColor: "#2C7BE5",
     alignItems: "center",
@@ -405,7 +404,7 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     color: "#FFFFFF",
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: "700",
   },
 });

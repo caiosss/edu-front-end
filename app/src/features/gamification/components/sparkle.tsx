@@ -22,6 +22,9 @@ type SparkleProps = {
   color?: string;
 };
 
+/** Pisca algumas vezes e some: brilho sem fim distrai e cansa a leitura. */
+const TWINKLE_COUNT = 3;
+
 export function Sparkle({
   x,
   y,
@@ -41,7 +44,7 @@ export function Sparkle({
           withTiming(1, { duration: duration * 0.45, easing: Easing.out(Easing.quad) }),
           withTiming(0, { duration: duration * 0.55, easing: Easing.in(Easing.quad) })
         ),
-        -1,
+        TWINKLE_COUNT,
         false
       )
     );

@@ -2,6 +2,7 @@ import axios from "axios";
 import type { LoginPayload, LoginResult } from "../features/login/types";
 import { useAuthStore } from "../store/auth-store";
 import { api } from "./api";
+import { ERROR_MESSAGES, FriendlyError } from "../utils/friendly-error";
 
 const invalidCredentialsCode = "INVALID_CREDENTIALS";
 
@@ -37,7 +38,7 @@ const extractPatientName = (data: unknown): string | null => {
 
 const normalizeLoginResponse = (data: unknown): LoginResult => {
   if (!data || typeof data !== "object") {
-    throw new Error("Resposta de autenticacao invalida.");
+    throw new Error("Resposta de autenticação inválida.");
   }
 
   const parsedData = data as {
@@ -56,15 +57,15 @@ const normalizeLoginResponse = (data: unknown): LoginResult => {
     asNonEmptyString(parsedData.tipoUsuario) ?? asNonEmptyString(parsedData.userType);
 
   if (!token) {
-    throw new Error("Resposta de autenticacao invalida: token ausente.");
+    throw new Error("Resposta de autenticação inválida: token ausente.");
   }
 
   if (!id) {
-    throw new Error("Resposta de autenticacao invalida: id ausente.");
+    throw new Error("Resposta de autenticação inválida: id ausente.");
   }
 
   if (!tipoUsuario) {
-    throw new Error("Resposta de autenticacao invalida: tipoUsuario ausente.");
+    throw new Error("Resposta de autenticação inválida: tipoUsuario ausente.");
   }
 
   return {
@@ -78,7 +79,7 @@ export class InvalidCredentialsError extends Error {
   code = invalidCredentialsCode;
 
   constructor() {
-    super("Credenciais invalidas.");
+    super("E-mail ou senha incorretos.");
     this.name = "InvalidCredentialsError";
   }
 }
@@ -119,7 +120,7 @@ export const fetchPatientNameByCpf = async (cpf: string): Promise<string> => {
   const normalizedCpf = normalizeCpf(cpf);
 
   if (normalizedCpf.length !== 11) {
-    throw new Error("Informe um CPF valido com 11 digitos.");
+    throw new FriendlyError("Informe um CPF válido, com 11 dígitos.");
   }
 
   try {
@@ -127,7 +128,7 @@ export const fetchPatientNameByCpf = async (cpf: string): Promise<string> => {
     const patientName = extractPatientName(response.data);
 
     if (!patientName) {
-      throw new Error("Resposta invalida da API ao consultar CPF.");
+      throw new Error("Resposta inválida da API ao consultar CPF.");
     }
 
     return patientName;
@@ -136,18 +137,18 @@ export const fetchPatientNameByCpf = async (cpf: string): Promise<string> => {
       const status = error.response?.status;
 
       if (status === 404) {
-        throw new Error("Paciente nao encontrado para o CPF informado.");
+        throw new FriendlyError("Não encontramos nenhum paciente com esse CPF. Confira os números.");
       }
 
       if (status === 400) {
-        throw new Error("CPF invalido para consulta.");
+        throw new FriendlyError("Esse CPF não é válido. Confira os números.");
       }
 
       if (!status) {
-        throw new Error("Nao foi possivel conectar com a API para consultar o CPF.");
+        throw new FriendlyError(ERROR_MESSAGES.network);
       }
 
-      throw new Error(`Falha ao consultar CPF (HTTP ${status}).`);
+      throw new FriendlyError("Não foi possível buscar o paciente agora. Tente de novo.");
     }
 
     throw error;

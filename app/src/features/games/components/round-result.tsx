@@ -74,7 +74,7 @@ export function RoundResult({ jogo, resultado, onPlayAgain, onBack }: RoundResul
         {resultado.acertouTudo ? (
           <Animated.View entering={ZoomIn.delay(900).springify().damping(10)} style={styles.allChip}>
             <Sparkles size={14} color="#7A4100" />
-            <Text style={styles.allChipText}>Todas certas</Text>
+            <Text style={styles.allChipText}>Você acertou todas!</Text>
           </Animated.View>
         ) : null}
 
@@ -111,7 +111,7 @@ export function RoundResult({ jogo, resultado, onPlayAgain, onBack }: RoundResul
         <ConfettiBurst
           burstKey={burstKey}
           origin={{ x: width / 2, y: -20 }}
-          count={resultado.acertouTudo ? 60 : 30}
+          count={resultado.acertouTudo ? 36 : 18}
           direction={90}
           spread={170}
           power={RAIN_POWER}
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
   },
   gameName: {
     color: "#35506B",
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: "700",
   },
   scoreRow: {
@@ -187,27 +187,27 @@ const styles = StyleSheet.create({
   },
   allChipText: {
     color: "#7A4100",
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: "800",
   },
   message: {
     color: "#12314C",
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "700",
-    lineHeight: 26,
+    lineHeight: 29,
     textAlign: "center",
     maxWidth: 340,
   },
   hint: {
     color: "#4F6982",
-    fontSize: 14,
+    fontSize: 17,
     textAlign: "center",
   },
   actions: {
     gap: 10,
   },
   secondaryButton: {
-    minHeight: 52,
+    minHeight: 56,
     borderRadius: 16,
     flexDirection: "row",
     alignItems: "center",
@@ -220,11 +220,11 @@ const styles = StyleSheet.create({
   },
   secondaryText: {
     color: "#1A5DB5",
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "800",
   },
   primaryButton: {
-    minHeight: 54,
+    minHeight: 56,
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
   },
   primaryText: {
     color: "#FFFFFF",
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: "800",
   },
 });

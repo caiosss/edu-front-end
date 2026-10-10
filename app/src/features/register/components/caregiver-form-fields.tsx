@@ -8,6 +8,7 @@ import type {
 import { fetchPatientNameByCpf } from "../../../services/auth-service";
 import type { RegistrationFormValues } from "../types";
 import { FormInput } from "./form-input";
+import { toFriendlyMessage } from "../../../utils/friendly-error";
 
 type FeedbackState = "idle" | "success" | "error";
 
@@ -68,7 +69,7 @@ export function CaregiverFormFields({
 
     if (normalizedCpf.length !== 11) {
       setCpfLookupState("error");
-      setCpfLookupMessage("Informe um CPF valido com 11 digitos.");
+      setCpfLookupMessage("Informe um CPF válido, com 11 dígitos.");
       return;
     }
 
@@ -87,9 +88,7 @@ export function CaregiverFormFields({
     } catch (error) {
       setCpfLookupState("error");
       setCpfLookupMessage(
-        error instanceof Error
-          ? error.message
-          : "Nao foi possivel consultar o paciente pelo CPF."
+        toFriendlyMessage(error, "Não foi possível buscar o paciente pelo CPF.")
       );
     } finally {
       setIsCpfLookupLoading(false);
@@ -159,7 +158,7 @@ export function CaregiverFormFields({
         control={control}
         name="cuidadorNomeCompleto"
         label="Nome completo"
-        placeholder="Ex: Joao Pereira"
+        placeholder="Ex.: João Pereira"
         autoCapitalize="words"
       />
       <FormInput
@@ -173,8 +172,8 @@ export function CaregiverFormFields({
       <FormInput
         control={control}
         name="cuidadorRelacao"
-        label="Relacao com o paciente"
-        placeholder="Ex: Pai, Mae, Conjuge"
+        label="Parentesco ou relação com o paciente"
+        placeholder="Ex.: pai, mãe, cônjuge"
         autoCapitalize="words"
       />
     </View>
@@ -186,7 +185,7 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   lookupButton: {
-    minHeight: 46,
+    minHeight: 56,
     borderRadius: 12,
     backgroundColor: "#2C7BE5",
     alignItems: "center",
@@ -203,7 +202,7 @@ const styles = StyleSheet.create({
   },
   lookupButtonText: {
     color: "#FFFFFF",
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: "700",
   },
   feedbackBox: {
@@ -221,7 +220,7 @@ const styles = StyleSheet.create({
   },
   feedbackText: {
     fontWeight: "600",
-    fontSize: 13,
+    fontSize: 16,
   },
   feedbackTextSuccess: {
     color: "#1F6B38",

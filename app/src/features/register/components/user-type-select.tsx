@@ -13,7 +13,7 @@ export function UserTypeSelect({ control }: UserTypeSelectProps) {
       name="tipoUsuario"
       render={({ field: { onChange, value }, fieldState: { error } }) => (
         <View style={styles.wrapper}>
-          <Text style={styles.label}>Tipo de usuario</Text>
+          <Text style={styles.label}>Tipo de usuário</Text>
           <View style={styles.optionsContainer}>
             {USER_TYPES.map((typeOption) => {
               const isSelected = value === typeOption;
@@ -51,7 +51,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   label: {
-    fontSize: 14,
+    fontSize: 17,
     fontWeight: "600",
     color: "#12314C",
   },
@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
   },
   option: {
     minWidth: 95,
-    minHeight: 42,
+    minHeight: 56,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#D5DEE8",
@@ -82,14 +82,14 @@ const styles = StyleSheet.create({
   optionText: {
     color: "#35506B",
     fontWeight: "600",
-    fontSize: 13,
+    fontSize: 16,
   },
   optionTextSelected: {
     color: "#1A4F8B",
   },
   errorText: {
     color: "#D64545",
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: "500",
   },
 });

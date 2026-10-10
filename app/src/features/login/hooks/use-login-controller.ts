@@ -36,11 +36,11 @@ export function useLoginController(): LoginController {
         setFeedbackState("error");
 
         if (isInvalidCredentialsError(error)) {
-          setFeedbackMessage("Credenciais invalidas. Verifique e tente novamente.");
+          setFeedbackMessage("E-mail ou senha incorretos. Confira e tente de novo.");
           return false;
         }
 
-        setFeedbackMessage("Nao foi possivel entrar no momento. Tente novamente.");
+        setFeedbackMessage("Não foi possível entrar agora. Tente de novo.");
         return false;
       }
     },

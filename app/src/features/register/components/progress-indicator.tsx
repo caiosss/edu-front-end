@@ -112,13 +112,13 @@ const styles = StyleSheet.create({
   stepBadgeText: {
     color: "#6E7F90",
     fontWeight: "700",
-    fontSize: 13,
+    fontSize: 16,
   },
   stepBadgeTextActive: {
     color: "#FFFFFF",
   },
   stepLabel: {
-    fontSize: 12,
+    fontSize: 16,
     color: "#6E7F90",
     textAlign: "center",
     fontWeight: "600",

@@ -37,7 +37,7 @@ export function GameCard({ situacao, index, isStarting, disabled, onStart }: Gam
           withTiming(1, { duration: 1400, easing: Easing.inOut(Easing.sin) }),
           withTiming(0, { duration: 1400, easing: Easing.inOut(Easing.sin) })
         ),
-        -1,
+        2,
         false
       );
     }
@@ -141,16 +141,16 @@ const styles = StyleSheet.create({
   },
   title: {
     color: "#12314C",
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "800",
   },
   description: {
     color: "#35506B",
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 17,
+    lineHeight: 24,
   },
   button: {
-    minHeight: 50,
+    minHeight: 56,
     borderRadius: 14,
     flexDirection: "row",
     alignItems: "center",
@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "800",
   },
   reason: {
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
   reasonText: {
     flex: 1,
     color: "#35506B",
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 17,
+    lineHeight: 24,
   },
 });

@@ -78,12 +78,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   label: {
-    fontSize: 14,
+    fontSize: 17,
     fontWeight: "600",
     color: "#12314C",
   },
   inputContainer: {
-    minHeight: 52,
+    minHeight: 60,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: "#D5DEE8",
@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 18,
     color: "#1B2F43",
     paddingVertical: 10,
   },
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: "#D64545",
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: "500",
   },
   passwordAction: {
@@ -116,6 +116,6 @@ const styles = StyleSheet.create({
   passwordActionText: {
     color: "#2C7BE5",
     fontWeight: "600",
-    fontSize: 13,
+    fontSize: 16,
   },
 });

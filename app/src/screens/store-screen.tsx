@@ -4,7 +4,7 @@ export default function StoreScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Loja</Text>
-      <Text style={styles.subtitle}>Aqui voce pode listar produtos, kits e beneficios.</Text>
+      <Text style={styles.subtitle}>Aqui você poderá ver produtos, kits e benefícios.</Text>
     </View>
   );
 }

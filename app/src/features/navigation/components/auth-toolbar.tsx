@@ -5,6 +5,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import type { AuthenticatedRoute, AuthenticatedRouteKey } from "../../../router/authenticated-routes";
+import { colors } from "../../../theme";
 
 type AuthToolbarProps = {
   routes: AuthenticatedRoute[];
@@ -20,6 +21,9 @@ type ToolbarItemProps = {
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
+/** Rotulos das abas crescem com a fonte do sistema so ate aqui, para caberem as quatro lado a lado. */
+const TAB_LABEL_MAX_FONT_SCALE = 1.3;
+
 function ToolbarItem({ route, isActive, onPress }: ToolbarItemProps) {
   const pressScale = useSharedValue(1);
 
@@ -28,6 +32,7 @@ function ToolbarItem({ route, isActive, onPress }: ToolbarItemProps) {
   }));
 
   const Icon = route.icon;
+  const color = isActive ? colors.primary : colors.textSecondary;
 
   return (
     <AnimatedPressable
@@ -38,11 +43,21 @@ function ToolbarItem({ route, isActive, onPress }: ToolbarItemProps) {
       onPressOut={() => {
         pressScale.value = 1;
       }}
+      accessibilityRole="tab"
+      accessibilityLabel={route.label}
+      accessibilityState={{ selected: isActive }}
       style={[styles.item, isActive ? styles.itemActive : undefined, animatedStyle]}
-      android_ripple={{ color: "rgba(44, 123, 229, 0.16)", borderless: false }}
+      android_ripple={{ color: "rgba(17, 85, 170, 0.16)", borderless: false }}
     >
-      <Icon size={18} color={isActive ? "#2C7BE5" : "#5D7389"} />
-      <Text style={[styles.label, isActive ? styles.labelActive : undefined]}>{route.label}</Text>
+      <Icon size={26} color={color} strokeWidth={isActive ? 2.4 : 2} />
+      <Text
+        style={[styles.label, isActive ? styles.labelActive : undefined]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        maxFontSizeMultiplier={TAB_LABEL_MAX_FONT_SCALE}
+      >
+        {route.label}
+      </Text>
     </AnimatedPressable>
   );
 }
@@ -53,7 +68,7 @@ export function AuthToolbar({
   onSelectRoute,
 }: AuthToolbarProps) {
   return (
-    <View style={styles.container}>
+    <View style={styles.container} accessibilityRole="tablist">
       {routes.map((route) => (
         <ToolbarItem
           key={route.key}
@@ -69,6 +84,7 @@ export function AuthToolbar({
 const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
+    gap: 4,
     borderRadius: 20,
     marginHorizontal: 12,
     marginBottom: 10,
@@ -85,23 +101,23 @@ const styles = StyleSheet.create({
   },
   item: {
     flex: 1,
-    minHeight: 54,
+    minHeight: 68,
     borderRadius: 14,
+    paddingHorizontal: 2,
     alignItems: "center",
     justifyContent: "center",
     gap: 4,
   },
   itemActive: {
-    backgroundColor: "#E6F1FF",
+    backgroundColor: colors.primarySoft,
   },
   label: {
-    color: "#5D7389",
-    fontSize: 12,
+    color: colors.textSecondary,
+    fontSize: 15,
     fontWeight: "600",
   },
   labelActive: {
-    color: "#2C7BE5",
-    fontWeight: "700",
+    color: colors.primary,
+    fontWeight: "800",
   },
 });
-

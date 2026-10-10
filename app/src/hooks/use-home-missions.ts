@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { MyMissionsResponse } from "../features/home/types";
 import { fetchMyMissions } from "../services/missions-service";
 import { useAuthStore } from "../store/auth-store";
+import { ERROR_MESSAGES, toFriendlyMessage } from "../utils/friendly-error";
 
 type UseHomeMissionsOptions = {
   enabled?: boolean;
@@ -34,7 +35,7 @@ export function useHomeMissions(
 
     if (!token) {
       setMissions(null);
-      setErrorMessage("Sessao sem token para carregar missoes.");
+      setErrorMessage(ERROR_MESSAGES.session);
       return;
     }
 
@@ -47,9 +48,7 @@ export function useHomeMissions(
     } catch (error) {
       setMissions(null);
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Nao foi possivel carregar as missoes da tela inicial."
+        toFriendlyMessage(error, "Não foi possível carregar seus medicamentos e missões.")
       );
     } finally {
       setIsLoading(false);

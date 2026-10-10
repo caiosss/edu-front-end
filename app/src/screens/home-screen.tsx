@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AppState, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import {
   Bell,
@@ -19,8 +19,8 @@ import type {
   GeneralMissionResponse,
   MedicationMissionResponse,
 } from "../features/home/types";
+import { firstName, formatLongDate, greetingFor } from "../features/home/utils/date-labels";
 import {
-  formatMedicationTimeLabel,
   getMedicationScheduleInfo,
   type MedicationScheduleInfo,
 } from "../features/home/utils/medication-schedule";
@@ -28,9 +28,11 @@ import ChecklistCard, {
   type ChecklistItem,
 } from "../features/navigation/components/check-list-card";
 import { useAuth } from "../hooks/useAuth";
+import { useCaregiverProfile } from "../hooks/use-caregiver-profile";
 import { useCompleteMission } from "../hooks/use-complete-mission";
 import { syncGamificationAfterReward, useGamification } from "../hooks/use-gamification";
 import { useHomeMissions } from "../hooks/use-home-missions";
+import { usePatientProfile } from "../hooks/use-patient-profile";
 import { useGamificationStore } from "../store/gamification-store";
 
 const DAILY_PROGRESS_GRADIENT = ["#63E6BE", "#20C997", "#2C7BE5"] as const;
@@ -72,7 +74,7 @@ const mapGeneralMissionToChecklistItem = (
 
 const mapMedicationMissionToChecklistItem = (
   mission: MedicationMissionResponse,
-  scheduleInfo?: MedicationScheduleInfo
+  scheduleInfo: MedicationScheduleInfo
 ): ChecklistItem => {
   const subtitleParts: string[] = [];
 
@@ -80,11 +82,8 @@ const mapMedicationMissionToChecklistItem = (
     subtitleParts.push(mission.dosagem.trim());
   }
 
-  const firstDoseTime =
-    scheduleInfo?.scheduledTimeLabel ?? formatMedicationTimeLabel(mission.horarioPrimeiraDose);
-
-  if (firstDoseTime) {
-    subtitleParts.push(firstDoseTime);
+  if (scheduleInfo.scheduledTimeLabel) {
+    subtitleParts.push(scheduleInfo.scheduledTimeLabel);
   }
 
   if (mission.frequenciaHoras > 0) {
@@ -94,11 +93,11 @@ const mapMedicationMissionToChecklistItem = (
   return {
     id: mission.id,
     title: mission.nomeMedicamento,
-    subtitle: subtitleParts.length > 0 ? subtitleParts.join(" - ") : undefined,
+    subtitle: subtitleParts.length > 0 ? subtitleParts.join(" · ") : undefined,
     icon: Pill,
-    disabledLabel: scheduleInfo?.disabledLabel,
+    disabledLabel: scheduleInfo.disabledLabel,
     notice:
-      scheduleInfo?.noticeMessage && scheduleInfo.noticeTone
+      scheduleInfo.noticeMessage && scheduleInfo.noticeTone
         ? {
             message: scheduleInfo.noticeMessage,
             tone: scheduleInfo.noticeTone,
@@ -108,7 +107,12 @@ const mapMedicationMissionToChecklistItem = (
 };
 
 export default function HomeScreen() {
-  const { role } = useAuth();
+  const { nome, tipoUsuario } = useAuth();
+  const isCaregiver = tipoUsuario === "CUIDADOR";
+  // O nome do token basta; os perfis so sao buscados quando ele nao vem.
+  const { patientProfile } = usePatientProfile({ enabled: !nome && !isCaregiver });
+  const { caregiverProfile } = useCaregiverProfile({ enabled: !nome && isCaregiver });
+
   const { missions, isLoading, errorMessage, refreshHomeMissions } = useHomeMissions();
   const {
     completeMission,
@@ -118,7 +122,8 @@ export default function HomeScreen() {
   const { isPatient, nivel, xpTotal, streak } = useGamification();
   const applyConclusao = useGamificationStore((state) => state.applyConclusao);
 
-  const [takenMedicationIds, setTakenMedicationIds] = useState<string[]>([]);
+  /** `slotKey` das doses registradas nesta sessao: uma dose nova nao herda o registro anterior. */
+  const [registeredDoseKeys, setRegisteredDoseKeys] = useState<string[]>([]);
   const [completedMissionIds, setCompletedMissionIds] = useState<string[]>([]);
   const [doseProgress, setDoseProgress] = useState<ProgressoDoDia | null>(null);
   const [completionErrorSection, setCompletionErrorSection] = useState<
@@ -151,6 +156,20 @@ export default function HomeScreen() {
     };
   }, []);
 
+  // O app costuma ficar aberto em segundo plano; ao voltar, o horario e o dia podem ter mudado.
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        setCurrentDate(new Date());
+        void refreshHomeMissions();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [refreshHomeMissions]);
+
   const medicationScheduleById = useMemo(() => {
     const scheduleById = new Map<string, MedicationScheduleInfo>();
 
@@ -161,27 +180,73 @@ export default function HomeScreen() {
     missions.missoesMedicamento.forEach((mission) => {
       scheduleById.set(
         mission.id,
-        getMedicationScheduleInfo(mission.horarioPrimeiraDose, currentDate)
+        getMedicationScheduleInfo(
+          mission.id,
+          mission.horarioPrimeiraDose,
+          mission.frequenciaHoras,
+          mission.concluida,
+          currentDate
+        )
       );
     });
 
     return scheduleById;
   }, [currentDate, missions]);
 
-  const medicationItems = useMemo(() => {
-    if (!missions) {
-      return [];
+  // Quando chega o horario de uma nova dose, o `concluida` do backend passa a valer para ela:
+  // recarrega para nao mostrar a dose nova como ja tomada.
+  const doseSlotsSignature = useMemo(
+    () =>
+      Array.from(medicationScheduleById.values())
+        .map((info) => info.slotKey)
+        .sort()
+        .join("|"),
+    [medicationScheduleById]
+  );
+  const previousSlotsSignature = useRef(doseSlotsSignature);
+
+  useEffect(() => {
+    if (previousSlotsSignature.current === doseSlotsSignature) {
+      return;
     }
 
-    return missions.missoesMedicamento
-      .filter((mission) => mission.ativo)
-      .map((mission) =>
-        mapMedicationMissionToChecklistItem(
-          mission,
-          medicationScheduleById.get(mission.id)
-        )
-      );
-  }, [medicationScheduleById, missions]);
+    const hadSlots = previousSlotsSignature.current !== "";
+    previousSlotsSignature.current = doseSlotsSignature;
+
+    if (hadSlots) {
+      void refreshHomeMissions();
+    }
+  }, [doseSlotsSignature, refreshHomeMissions]);
+
+  const activeMedicationMissions = useMemo(
+    () => missions?.missoesMedicamento.filter((mission) => mission.ativo) ?? [],
+    [missions]
+  );
+
+  const medicationItems = useMemo(
+    () =>
+      activeMedicationMissions.flatMap((mission) => {
+        const scheduleInfo = medicationScheduleById.get(mission.id);
+        return scheduleInfo ? [mapMedicationMissionToChecklistItem(mission, scheduleInfo)] : [];
+      }),
+    [activeMedicationMissions, medicationScheduleById]
+  );
+
+  const takenMedicationIds = useMemo(
+    () =>
+      activeMedicationMissions
+        .filter((mission) => {
+          const scheduleInfo = medicationScheduleById.get(mission.id);
+
+          return (
+            scheduleInfo?.status === "done" ||
+            (scheduleInfo?.status !== "upcoming" &&
+              registeredDoseKeys.includes(scheduleInfo?.slotKey ?? ""))
+          );
+        })
+        .map((mission) => mission.id),
+    [activeMedicationMissions, medicationScheduleById, registeredDoseKeys]
+  );
 
   const dailyMissionItems = useMemo(() => {
     if (!missions) {
@@ -200,16 +265,6 @@ export default function HomeScreen() {
 
     return missions.missoesGerais
       .filter((mission) => mission.ativa && mission.concluida)
-      .map((mission) => mission.id);
-  }, [missions]);
-
-  const completedMedicationItemIds = useMemo(() => {
-    if (!missions) {
-      return [];
-    }
-
-    return missions.missoesMedicamento
-      .filter((mission) => mission.ativo && mission.concluida)
       .map((mission) => mission.id);
   }, [missions]);
 
@@ -237,54 +292,27 @@ export default function HomeScreen() {
       .map((mission) => mission.id);
   }, [completingMissionKeys, missions]);
 
-  const blockedMedicationItemIds = useMemo(() => {
-    if (!missions) {
-      return [];
-    }
+  const blockedMedicationItemIds = useMemo(
+    () =>
+      activeMedicationMissions
+        .filter(
+          (mission) =>
+            !takenMedicationIds.includes(mission.id) &&
+            medicationScheduleById.get(mission.id)?.status === "upcoming"
+        )
+        .map((mission) => mission.id),
+    [activeMedicationMissions, medicationScheduleById, takenMedicationIds]
+  );
 
-    return missions.missoesMedicamento
-      .filter(
+  const hasOverdueMedication = useMemo(
+    () =>
+      activeMedicationMissions.some(
         (mission) =>
-          mission.ativo &&
           !takenMedicationIds.includes(mission.id) &&
-          medicationScheduleById.get(mission.id)?.status === "blocked"
-      )
-      .map((mission) => mission.id);
-  }, [medicationScheduleById, missions, takenMedicationIds]);
-
-  const hasOverdueMedication = useMemo(() => {
-    if (!missions) {
-      return false;
-    }
-
-    return missions.missoesMedicamento.some(
-      (mission) =>
-        mission.ativo &&
-        !takenMedicationIds.includes(mission.id) &&
-        medicationScheduleById.get(mission.id)?.status === "overdue"
-    );
-  }, [medicationScheduleById, missions, takenMedicationIds]);
-
-  useEffect(() => {
-    const activeMedicationItemIdSet = new Set(
-      missions?.missoesMedicamento
-        .filter((mission) => mission.ativo)
-        .map((mission) => mission.id) ?? []
-    );
-    const completedMedicationItemIdSet = new Set(completedMedicationItemIds);
-
-    setTakenMedicationIds((currentIds) =>
-      Array.from(
-        currentIds.reduce((nextIds, id) => {
-          if (activeMedicationItemIdSet.has(id)) {
-            nextIds.add(id);
-          }
-
-          return nextIds;
-        }, completedMedicationItemIdSet)
-      )
-    );
-  }, [completedMedicationItemIds, missions]);
+          medicationScheduleById.get(mission.id)?.status === "late"
+      ),
+    [activeMedicationMissions, medicationScheduleById, takenMedicationIds]
+  );
 
   useEffect(() => {
     const activeMissionItemIdSet = new Set(dailyMissionItems.map((item) => item.id));
@@ -311,31 +339,23 @@ export default function HomeScreen() {
       return;
     }
 
-    const medicationMission = missions?.missoesMedicamento.find(
-      (currentMission) => currentMission.id === itemId
-    );
+    const scheduleInfo = medicationScheduleById.get(itemId);
 
-    if (!medicationMission) {
-      return;
-    }
-
-    const scheduleInfo =
-      medicationScheduleById.get(medicationMission.id) ??
-      getMedicationScheduleInfo(medicationMission.horarioPrimeiraDose, currentDate);
-
-    if (scheduleInfo.isBlocked) {
+    if (!scheduleInfo || scheduleInfo.status === "upcoming") {
       return;
     }
 
     setCompletionErrorSection(null);
 
     const conclusao = await completeMission({
-      prescricaoItemId: medicationMission.id,
+      prescricaoItemId: itemId,
     });
 
     if (conclusao) {
-      setTakenMedicationIds((currentIds) =>
-        currentIds.includes(itemId) ? currentIds : [...currentIds, itemId]
+      setRegisteredDoseKeys((currentKeys) =>
+        currentKeys.includes(scheduleInfo.slotKey)
+          ? currentKeys
+          : [...currentKeys, scheduleInfo.slotKey]
       );
       setCompletionErrorSection(null);
       handleConclusao(conclusao);
@@ -394,7 +414,8 @@ export default function HomeScreen() {
     takenMedicationIds.length,
   ]);
 
-  const welcomeName = role === "Paciente" ? "Paciente" : "Cuidador";
+  const name = firstName(nome ?? patientProfile?.nomeCompleto ?? caregiverProfile?.nomeCompleto);
+  const greeting = name ? `${greetingFor(currentDate)}, ${name}!` : `${greetingFor(currentDate)}!`;
 
   const medicationDescription = useMemo(() => {
     if (completionErrorSection === "medication" && completeMissionErrorMessage) {
@@ -410,11 +431,11 @@ export default function HomeScreen() {
     }
 
     if (hasOverdueMedication) {
-      return "Confira os medicamentos em vermelho: o horario ja passou.";
+      return "Confira os medicamentos em vermelho: o horário já passou.";
     }
 
     if (blockedMedicationItemIds.length > 0) {
-      return "Alguns medicamentos ainda nao chegaram ao horario de conclusao.";
+      return "Alguns medicamentos ainda não estão no horário.";
     }
 
     return "Acompanhe e marque cada dose no horário certo.";
@@ -458,16 +479,21 @@ export default function HomeScreen() {
       >
       <Animated.View entering={FadeInDown.duration(220)} style={styles.heroCard}>
         <View style={styles.heroHeader}>
-          <Text style={styles.title}>Bem-vindo!</Text>
+          <View style={styles.heroTitleBlock}>
+            <Text style={styles.title} accessibilityRole="header">
+              {greeting}
+            </Text>
+            <Text style={styles.dateText}>{formatLongDate(currentDate)}</Text>
+          </View>
           <View style={styles.notificationButton}>
-            <Bell size={18} color="#2C7BE5" />
+            <Bell size={22} color="#2C7BE5" />
           </View>
         </View>
-        <Text style={styles.subtitle}>Vamos comecar seu plano de autocuidado de hoje?</Text>
+        <Text style={styles.subtitle}>Vamos começar os cuidados de hoje?</Text>
 
         {isPatient ? (
           <Animated.View entering={FadeIn.delay(160).duration(260)} style={styles.levelStrip}>
-            <LevelRing nivel={nivel} size={58} strokeWidth={6} delay={200} />
+            <LevelRing nivel={nivel} size={64} strokeWidth={6} delay={200} />
             <View style={styles.levelInfo}>
               <View style={styles.levelHeader}>
                 <Text style={styles.levelTitle}>
@@ -478,7 +504,7 @@ export default function HomeScreen() {
               <AnimatedXpBar
                 ratio={nivelRatio(nivel)}
                 levelKey={nivel?.atual}
-                height={10}
+                height={12}
                 delay={260}
               />
               <Text style={styles.levelHint}>
@@ -488,7 +514,7 @@ export default function HomeScreen() {
               </Text>
               {streak && streak.atual > 0 ? (
                 <View style={styles.streakChip}>
-                  <Flame size={13} color="#E8590C" />
+                  <Flame size={16} color="#E8590C" />
                   <Text style={styles.streakText}>
                     Sequência: {streak.atual} {streak.atual === 1 ? "dia" : "dias"}
                   </Text>
@@ -525,7 +551,7 @@ export default function HomeScreen() {
       <Animated.View entering={FadeInDown.delay(180).duration(250)} style={styles.card}>
         <View style={styles.progressHeader}>
           <Text style={styles.h2}>Progresso de hoje</Text>
-          {dailyProgress.isComplete ? <Sparkles size={20} color="#F5B942" /> : null}
+          {dailyProgress.isComplete ? <Sparkles size={24} color="#F5B942" /> : null}
         </View>
         <Text style={styles.info}>
           {dailyProgress.isComplete
@@ -533,7 +559,7 @@ export default function HomeScreen() {
             : `Você concluiu ${dailyProgress.done} de ${dailyProgress.total} atividades hoje.`}
         </Text>
 
-        <AnimatedXpBar ratio={dailyProgress.ratio} colors={DAILY_PROGRESS_GRADIENT} height={12} />
+        <AnimatedXpBar ratio={dailyProgress.ratio} colors={DAILY_PROGRESS_GRADIENT} height={14} />
 
         {doseProgress ? (
           <Text style={styles.progressHint}>
@@ -551,96 +577,32 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 18,
     paddingBottom: 18,
-    gap: 14,
+    gap: 16,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
+    lineHeight: 34,
     fontWeight: "700",
     color: "#12314C",
   },
+  dateText: {
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: "600",
+    color: "#35506B",
+  },
   h2: {
-    fontSize: 20,
+    fontSize: 22,
+    lineHeight: 28,
     fontWeight: "700",
     color: "#12314C",
   },
   heroCard: {
     borderRadius: 18,
-    padding: 16,
-    backgroundColor: "#FDFEFF",
-    shadowColor: "#173B5D",
-    shadowOpacity: 0.07,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 3,
-    gap: 8,
-  },
-  heroHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  notificationButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#E8F2FF",
-  },
-  levelStrip: {
-    marginTop: 6,
-    borderRadius: 14,
-    padding: 12,
-    backgroundColor: "#F1F7FE",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  levelInfo: {
-    flex: 1,
-    gap: 5,
-  },
-  levelHeader: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-  },
-  levelTitle: {
-    color: "#12314C",
-    fontSize: 15,
-    fontWeight: "800",
-  },
-  levelXp: {
-    color: "#1A6FD6",
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  levelHint: {
-    color: "#5B738A",
-    fontSize: 12,
-  },
-  streakChip: {
-    alignSelf: "flex-start",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    backgroundColor: "#FFF4E6",
-  },
-  streakText: {
-    color: "#7A3E00",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  card: {
-    borderRadius: 18,
-    padding: 16,
+    padding: 18,
     backgroundColor: "#FDFEFF",
     shadowColor: "#173B5D",
     shadowOpacity: 0.07,
@@ -649,15 +611,92 @@ const styles = StyleSheet.create({
     elevation: 3,
     gap: 10,
   },
-  subtitle: {
-    fontSize: 14,
+  heroHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  heroTitleBlock: {
+    flex: 1,
+    gap: 2,
+  },
+  notificationButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#E8F2FF",
+  },
+  levelStrip: {
+    marginTop: 6,
+    borderRadius: 14,
+    padding: 14,
+    backgroundColor: "#F1F7FE",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  levelInfo: {
+    flex: 1,
+    gap: 6,
+  },
+  levelHeader: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+  },
+  levelTitle: {
+    color: "#12314C",
+    fontSize: 19,
+    fontWeight: "800",
+  },
+  levelXp: {
+    color: "#1A6FD6",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  levelHint: {
     color: "#48627A",
-    lineHeight: 20,
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  streakChip: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: "#FFF4E6",
+  },
+  streakText: {
+    color: "#7A3E00",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  card: {
+    borderRadius: 18,
+    padding: 18,
+    backgroundColor: "#FDFEFF",
+    shadowColor: "#173B5D",
+    shadowOpacity: 0.07,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 3,
+    gap: 12,
+  },
+  subtitle: {
+    fontSize: 18,
+    color: "#35506B",
+    lineHeight: 26,
   },
   info: {
-    fontSize: 14,
+    fontSize: 18,
     color: "#35506B",
-    lineHeight: 20,
+    lineHeight: 26,
   },
   progressHeader: {
     flexDirection: "row",
@@ -665,8 +704,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   progressHint: {
-    color: "#5B738A",
-    fontSize: 12,
+    color: "#48627A",
+    fontSize: 16,
     fontWeight: "600",
   },
 });

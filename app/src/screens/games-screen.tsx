@@ -11,7 +11,7 @@ import {
   View,
 } from "react-native";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
-import { Brain, History, Info, RefreshCw } from "lucide-react-native";
+import { Puzzle, History, Info, RefreshCw } from "lucide-react-native";
 import { AssociationRound } from "../features/games/components/association-round";
 import { GameCard } from "../features/games/components/game-card";
 import { MultipleChoiceRound } from "../features/games/components/multiple-choice-round";
@@ -34,6 +34,7 @@ import {
   submitRoundResult,
 } from "../services/games-service";
 import { createIdempotencyKey } from "../utils/idempotency-key";
+import { toFriendlyMessage } from "../utils/friendly-error";
 
 type Envio = {
   rodada: RodadaJogo;
@@ -85,7 +86,7 @@ export default function GamesScreen() {
       setFase({ tipo: "jogando", rodada });
     } catch (error) {
       setFase({ tipo: "lobby" });
-      setAvisoLobby(error instanceof Error ? error.message : "Não foi possível abrir a rodada.");
+      setAvisoLobby(toFriendlyMessage(error, "Não foi possível abrir a rodada."));
       void lobby.refresh();
     } finally {
       setAbrindo(null);
@@ -109,7 +110,7 @@ export default function GamesScreen() {
       setFase({
         tipo: "falhaEnvio",
         envio,
-        mensagem: error instanceof Error ? error.message : "Não foi possível registrar a rodada.",
+        mensagem: toFriendlyMessage(error, "Não foi possível registrar a rodada."),
         podeReenviar: error instanceof GameNetworkError,
       });
     }
@@ -170,7 +171,7 @@ export default function GamesScreen() {
     return (
       <View style={styles.centered}>
         <View style={styles.infoCard}>
-          <Brain size={28} color="#2C7BE5" />
+          <Puzzle size={28} color="#2C7BE5" />
           <Text style={styles.infoTitle}>Disponível para pacientes</Text>
           <Text style={styles.supportingText}>
             Os jogos usam a prescrição e o plano de cuidado de cada paciente para treinar
@@ -265,7 +266,7 @@ export default function GamesScreen() {
     >
       <Animated.View entering={FadeInDown.duration(240)} style={styles.hero}>
         <View style={styles.heroIcon}>
-          <Brain size={26} color="#FFFFFF" />
+          <Puzzle size={26} color="#FFFFFF" />
         </View>
         <View style={styles.heroText}>
           <Text style={styles.title}>Treine sua rotina</Text>
@@ -371,13 +372,13 @@ const styles = StyleSheet.create({
   },
   title: {
     color: "#12314C",
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "800",
   },
   supportingText: {
     color: "#35506B",
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 17,
+    lineHeight: 24,
   },
   notice: {
     flexDirection: "row",
@@ -390,8 +391,8 @@ const styles = StyleSheet.create({
   noticeText: {
     flex: 1,
     color: "#23405C",
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 17,
+    lineHeight: 24,
   },
   loading: {
     marginVertical: 24,
@@ -406,18 +407,18 @@ const styles = StyleSheet.create({
   },
   infoTitle: {
     color: "#12314C",
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: "800",
     textAlign: "center",
   },
   sendingText: {
     color: "#35506B",
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "700",
   },
   primaryButton: {
     alignSelf: "stretch",
-    minHeight: 52,
+    minHeight: 56,
     borderRadius: 16,
     flexDirection: "row",
     alignItems: "center",
@@ -427,12 +428,12 @@ const styles = StyleSheet.create({
   },
   primaryText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "800",
   },
   secondaryButton: {
     alignSelf: "stretch",
-    minHeight: 48,
+    minHeight: 56,
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
@@ -440,7 +441,7 @@ const styles = StyleSheet.create({
   },
   secondaryText: {
     color: "#1A5DB5",
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: "800",
   },
   historyCard: {
@@ -456,11 +457,11 @@ const styles = StyleSheet.create({
   },
   historyTitle: {
     color: "#12314C",
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: "800",
   },
   historyRow: {
-    minHeight: 44,
+    minHeight: 56,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
@@ -471,16 +472,16 @@ const styles = StyleSheet.create({
   historyGame: {
     flex: 1,
     color: "#23405C",
-    fontSize: 14,
+    fontSize: 17,
     fontWeight: "700",
   },
   historyScore: {
     color: "#12314C",
-    fontSize: 14,
+    fontSize: 17,
     fontWeight: "800",
   },
   historyDate: {
     color: "#4F6982",
-    fontSize: 12,
+    fontSize: 16,
   },
 });

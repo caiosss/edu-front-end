@@ -41,7 +41,7 @@ export function RewardsCard({
           hitSlop={8}
           style={styles.seeAll}
         >
-          <Text style={styles.seeAllText}>ver extrato</Text>
+          <Text style={styles.seeAllText}>Ver extrato</Text>
           <ChevronRight size={16} color="#5F3DC4" />
         </Pressable>
       </View>

@@ -13,6 +13,7 @@ import type {
   SituacaoJogo,
 } from "../features/games/types";
 import { api, extractApiErrorMessage } from "./api";
+import { ERROR_MESSAGES, FriendlyError } from "../utils/friendly-error";
 
 const JOGOS: readonly Jogo[] = ["MULTIPLA_ESCOLHA", "ASSOCIACAO", "MEU_DIA", "ARRUME_A_MALA"];
 const CAMPOS: readonly CampoPergunta[] = ["FREQUENCIA", "HORARIOS", "HORARIO_DOSE", "ITEM_MALA"];
@@ -122,9 +123,9 @@ const normalizePergunta = (data: unknown): PerguntaJogo | null => {
 };
 
 /** Sem resposta do servidor: a nova tentativa deve reenviar a mesma `Idempotency-Key`. */
-export class GameNetworkError extends Error {
+export class GameNetworkError extends FriendlyError {
   constructor() {
-    super("Não foi possível conectar com a API de jogos.");
+    super(ERROR_MESSAGES.network);
     this.name = "GameNetworkError";
   }
 }
@@ -137,13 +138,18 @@ const toGamesError = (error: unknown, action: string): Error => {
       return new GameNetworkError();
     }
 
-    if (status === 401) {
-      return new Error(`Sessão sem permissão para ${action}.`);
+    if (status === 401 || status === 403) {
+      return new FriendlyError(ERROR_MESSAGES.session);
+    }
+
+    if (status >= 500) {
+      return new FriendlyError(ERROR_MESSAGES.server);
     }
 
     // 409 traz o motivo pronto para o paciente (jogo indisponivel, rodada expirada ou encerrada).
-    return new Error(
-      extractApiErrorMessage(error.response?.data) ?? `Falha ao ${action} (HTTP ${status}).`
+    return new FriendlyError(
+      extractApiErrorMessage(error.response?.data) ??
+        `Não foi possível ${action} agora. Tente de novo.`
     );
   }
 
@@ -157,7 +163,7 @@ export const fetchAvailableGames = async (): Promise<SituacaoJogo[]> => {
     const lista = asObject(response.data)?.jogos;
 
     if (!Array.isArray(lista)) {
-      throw new Error("Resposta de jogos disponiveis invalida.");
+      throw new Error("Resposta de jogos disponíveis inválida.");
     }
 
     return lista.flatMap((item) => {
@@ -193,14 +199,14 @@ export const startGameRound = async (jogo: Jogo): Promise<RodadaJogo> => {
       : [];
 
     if (!rodada || !rodadaId || perguntas.length === 0) {
-      throw new Error("Resposta de rodada invalida.");
+      throw new Error("Resposta de rodada inválida.");
     }
 
     const prateleira = normalizePrateleira(rodada.prateleira);
 
     // Sem prateleira nao ha o que colocar na mala: melhor recusar do que abrir uma rodada morta.
     if (jogo === "ARRUME_A_MALA" && prateleira.length === 0) {
-      throw new Error("Resposta de rodada invalida.");
+      throw new Error("Resposta de rodada inválida.");
     }
 
     return {
@@ -234,7 +240,7 @@ export const submitRoundResult = async (
     const total = asInteger(resultado?.total);
 
     if (!resultado || acertos === null || total === null) {
-      throw new Error("Resposta de resultado invalida.");
+      throw new Error("Resposta de resultado inválida.");
     }
 
     return {
@@ -255,7 +261,7 @@ export const fetchRoundHistory = async (limite = 5): Promise<RodadaResumo[]> => 
     const response = await api.get("/jogos/rodadas", { params: { limite } });
 
     if (!Array.isArray(response.data)) {
-      throw new Error("Resposta de historico de jogos invalida.");
+      throw new Error("Resposta de histórico de jogos inválida.");
     }
 
     return response.data.flatMap((item) => {
@@ -277,6 +283,6 @@ export const fetchRoundHistory = async (limite = 5): Promise<RodadaResumo[]> => 
         : [];
     });
   } catch (error) {
-    throw toGamesError(error, "carregar o historico de jogos");
+    throw toGamesError(error, "carregar o histórico de jogos");
   }
 };

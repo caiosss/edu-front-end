@@ -3,6 +3,7 @@ import type { LoginResult } from "../features/login/types";
 import type { RegisterPayload } from "../features/register/types";
 import { api } from "./api";
 import { fetchCurrentPatientId } from "./patient-service";
+import { ERROR_MESSAGES, FriendlyError } from "../utils/friendly-error";
 
 const asNonEmptyString = (value: unknown): string | null => {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
@@ -25,7 +26,7 @@ const extractBackendMessage = (data: unknown): string | null => {
 
 const normalizeRegistrationResponse = (data: unknown): LoginResult => {
   if (!data || typeof data !== "object") {
-    throw new Error("Resposta de cadastro invalida.");
+    throw new Error("Resposta de cadastro inválida.");
   }
 
   const parsedData = data as {
@@ -38,7 +39,7 @@ const normalizeRegistrationResponse = (data: unknown): LoginResult => {
   const token = asNonEmptyString(parsedData.token);
 
   if (!id || !tipoUsuario || !token) {
-    throw new Error("Resposta de cadastro invalida.");
+    throw new Error("Resposta de cadastro inválida.");
   }
 
   return { id, tipoUsuario, token };
@@ -47,7 +48,7 @@ const normalizeRegistrationResponse = (data: unknown): LoginResult => {
 export const registerUser = async (payload: RegisterPayload): Promise<LoginResult> => {
   if (!api.defaults.baseURL) {
     throw new Error(
-      "URL da API nao configurada. Defina EXPO_PUBLIC_API_URL no .env e reinicie o app."
+      "URL da API não configurada. Defina EXPO_PUBLIC_API_URL no .env e reinicie o app."
     );
   }
 
@@ -60,22 +61,26 @@ export const registerUser = async (payload: RegisterPayload): Promise<LoginResul
       const backendMessage = extractBackendMessage(error.response?.data);
 
       if (status === 409) {
-        throw new Error(backendMessage ?? "Este e-mail ja esta cadastrado.");
+        throw new FriendlyError(backendMessage ?? "Este e-mail já está cadastrado.");
       }
 
       if (status === 400) {
-        throw new Error(backendMessage ?? "Dados de cadastro invalidos.");
+        throw new FriendlyError(
+          backendMessage ?? "Alguns dados do cadastro estão incorretos. Confira e tente de novo."
+        );
       }
 
       if (status && status >= 500) {
-        throw new Error(backendMessage ?? "A API retornou erro interno no cadastro.");
+        throw new FriendlyError(ERROR_MESSAGES.server);
       }
 
       if (!status) {
-        throw new Error("Nao foi possivel conectar com a API de cadastro.");
+        throw new FriendlyError(ERROR_MESSAGES.network);
       }
 
-      throw new Error(backendMessage ?? `Falha ao cadastrar (HTTP ${status}).`);
+      throw new FriendlyError(
+        backendMessage ?? "Não foi possível concluir o cadastro agora. Tente de novo."
+      );
     }
 
     throw error;
@@ -86,7 +91,7 @@ export const registerCaregiverAndCreateLink = async (
   payload: RegisterPayload
 ): Promise<void> => {
   if (payload.tipoUsuario !== "CUIDADOR") {
-    throw new Error("Tipo de usuario invalido para cadastrar cuidador.");
+    throw new Error("Tipo de usuário inválido para cadastrar cuidador.");
   }
 
   // Resolve o paciente antes do cadastro para evitar criar uma conta orfa
@@ -105,7 +110,7 @@ export const registerCaregiverAndCreateLink = async (
     );
 
     if (!cuidadorId) {
-      throw new Error("Resposta de cuidador invalida: id ausente.");
+      throw new Error("Resposta de cuidador inválida: id ausente.");
     }
 
     await api.post("/vinculos", {
@@ -119,20 +124,21 @@ export const registerCaregiverAndCreateLink = async (
       const backendMessage = extractBackendMessage(error.response?.data);
 
       if (status === 409) {
-        throw new Error(backendMessage ?? "O vinculo com este cuidador ja existe.");
+        throw new FriendlyError(backendMessage ?? "Este cuidador já está vinculado a você.");
       }
 
       if (status === 400) {
-        throw new Error(backendMessage ?? "Nao foi possivel criar o vinculo.");
+        throw new FriendlyError(backendMessage ?? "Não foi possível vincular o cuidador.");
       }
 
       if (!status) {
-        throw new Error("Cuidador criado, mas nao foi possivel conectar para criar o vinculo.");
+        throw new FriendlyError(
+          "O cuidador foi criado, mas a conexão caiu antes de vincular. Tente de novo."
+        );
       }
 
-      throw new Error(
-        backendMessage ??
-          `Cuidador criado, mas o vinculo falhou (HTTP ${status}).`
+      throw new FriendlyError(
+        backendMessage ?? "O cuidador foi criado, mas não foi possível vincular. Tente de novo."
       );
     }
 

@@ -6,6 +6,7 @@ import {
   completeMission as completeMissionRequest,
 } from "../services/missions-service";
 import { createIdempotencyKey } from "../utils/idempotency-key";
+import { ERROR_MESSAGES, toFriendlyMessage } from "../utils/friendly-error";
 
 /**
  * Janela em que uma nova tentativa reaproveita a mesma `Idempotency-Key`. Depois dela, o toque
@@ -69,7 +70,7 @@ export function useCompleteMission(): UseCompleteMissionResult {
       const missionKey = prescricaoItemId || planoMissaoItemId;
 
       if (!missionKey) {
-        setErrorMessage("ID do item do plano ou da prescricao ausente.");
+        setErrorMessage(ERROR_MESSAGES.generic);
         return null;
       }
 
@@ -95,7 +96,7 @@ export function useCompleteMission(): UseCompleteMissionResult {
         }
 
         setErrorMessage(
-          error instanceof Error ? error.message : "Nao foi possivel concluir a missao."
+          toFriendlyMessage(error, "Não foi possível registrar agora. Tente de novo.")
         );
         return null;
       } finally {

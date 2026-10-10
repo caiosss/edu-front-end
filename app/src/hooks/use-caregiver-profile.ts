@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { CaregiverProfileResponse } from "../features/profile/types";
 import { fetchCurrentCaregiverProfile } from "../services/caregiver-service";
 import { useAuthStore } from "../store/auth-store";
+import { ERROR_MESSAGES, toFriendlyMessage } from "../utils/friendly-error";
 
 type UseCaregiverProfileOptions = {
   enabled?: boolean;
@@ -35,7 +36,7 @@ export function useCaregiverProfile(
 
     if (!token) {
       setCaregiverProfile(null);
-      setErrorMessage("Sessao nao autenticada para carregar o cuidador.");
+      setErrorMessage(ERROR_MESSAGES.session);
       return;
     }
 
@@ -48,9 +49,7 @@ export function useCaregiverProfile(
     } catch (error) {
       setCaregiverProfile(null);
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Nao foi possivel carregar o perfil do cuidador."
+        toFriendlyMessage(error, "Não foi possível carregar o perfil do cuidador.")
       );
     } finally {
       setIsLoading(false);

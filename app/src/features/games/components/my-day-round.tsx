@@ -205,7 +205,7 @@ export function MyDayRound({ rodada, onFinish, onExit }: MyDayRoundProps) {
       setSelecionada(null);
       setFeedback({
         tipo: "acerto",
-        texto: `${missoes[selecionada.indice]?.nome ?? "Missão"} às ${linha[opcao]}. Missão entra no horário que combina com o seu dia.`,
+        texto: `${missoes[selecionada.indice]?.nome ?? "Missão"} às ${linha[opcao]}. Cada missão vai no horário que combina com o seu dia.`,
       });
       return;
     }
@@ -244,7 +244,7 @@ export function MyDayRound({ rodada, onFinish, onExit }: MyDayRoundProps) {
           hitSlop={10}
           style={styles.exitButton}
         >
-          <X size={22} color="#35506B" />
+          <X size={26} color="#35506B" />
         </Pressable>
         <View style={styles.headerProgress}>
           <Text style={styles.progressLabel}>
@@ -501,7 +501,7 @@ export function MyDayRound({ rodada, onFinish, onExit }: MyDayRoundProps) {
         <ConfettiBurst
           burstKey={burstKey}
           origin={{ x: width / 2, y: 220 }}
-          count={20}
+          count={12}
           colors={ACERTO_COLORS}
           spread={360}
           power={ACERTO_POWER}
@@ -526,8 +526,8 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   exitButton: {
-    width: 44,
-    height: 44,
+    width: 52,
+    height: 52,
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
@@ -539,14 +539,14 @@ const styles = StyleSheet.create({
   },
   progressLabel: {
     color: "#35506B",
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: "700",
   },
   instruction: {
     color: "#12314C",
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: "800",
-    lineHeight: 24,
+    lineHeight: 27,
     paddingHorizontal: 20,
     paddingBottom: 8,
   },
@@ -556,7 +556,7 @@ const styles = StyleSheet.create({
   },
   trayTitle: {
     color: "#4F6982",
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: "800",
     letterSpacing: 0.8,
     textTransform: "uppercase",
@@ -568,7 +568,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   card: {
-    width: 116,
+    width: 128,
     minHeight: 86,
     borderRadius: 14,
     borderWidth: 2,
@@ -594,13 +594,13 @@ const styles = StyleSheet.create({
   },
   cardName: {
     color: "#12314C",
-    fontSize: 14,
+    fontSize: 17,
     fontWeight: "800",
-    lineHeight: 18,
+    lineHeight: 22,
   },
   cardKind: {
     color: "#4F6982",
-    fontSize: 11,
+    fontSize: 15,
     fontWeight: "700",
   },
   content: {
@@ -619,13 +619,13 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   turnoTitle: {
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: "800",
     letterSpacing: 0.8,
     textTransform: "uppercase",
   },
   slot: {
-    minHeight: 46,
+    minHeight: 56,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
@@ -650,9 +650,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   slotHour: {
-    width: 52,
+    width: 68,
     color: "#23405C",
-    fontSize: 14,
+    fontSize: 17,
     fontWeight: "800",
   },
   slotBody: {
@@ -664,7 +664,7 @@ const styles = StyleSheet.create({
   },
   slotEmpty: {
     color: "#7F93A8",
-    fontSize: 12,
+    fontSize: 16,
   },
   chip: {
     flexDirection: "row",
@@ -684,7 +684,7 @@ const styles = StyleSheet.create({
   },
   chipText: {
     flexShrink: 1,
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: "700",
   },
   chipTextOk: {
@@ -709,9 +709,9 @@ const styles = StyleSheet.create({
   },
   feedbackText: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: "700",
-    lineHeight: 21,
+    lineHeight: 25,
   },
   feedbackTextGood: {
     color: "#0B5E3B",
@@ -725,7 +725,7 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
   },
   finishButton: {
-    minHeight: 54,
+    minHeight: 56,
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
@@ -739,7 +739,7 @@ const styles = StyleSheet.create({
   },
   finishText: {
     color: "#FFFFFF",
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: "800",
   },
 });

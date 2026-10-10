@@ -1,8 +1,8 @@
 import type { ComponentType } from "react";
 import {
-  Brain,
   House,
   Medal,
+  Puzzle,
   UserRound,
   type LucideIcon,
 } from "lucide-react-native";
@@ -35,8 +35,8 @@ export const authenticatedRoutes: AuthenticatedRoute[] = [
   },
   {
     key: "treino",
-    label: "Treinar",
-    icon: Brain,
+    label: "Jogos",
+    icon: Puzzle,
     component: GamesScreen,
   },
   {

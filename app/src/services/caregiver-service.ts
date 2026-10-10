@@ -1,6 +1,7 @@
 import axios from "axios";
 import type { CaregiverProfileResponse } from "../features/profile/types";
 import { api } from "./api";
+import { ERROR_MESSAGES, FriendlyError } from "../utils/friendly-error";
 
 const asNonEmptyString = (value: unknown): string | null => {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
@@ -19,7 +20,7 @@ const asStringArray = (value: unknown): string[] => {
 
 const normalizeCaregiverProfileResponse = (data: unknown): CaregiverProfileResponse => {
   if (!data || typeof data !== "object") {
-    throw new Error("Resposta de cuidador invalida.");
+    throw new Error("Resposta de cuidador inválida.");
   }
 
   const parsedData = data as {
@@ -40,7 +41,7 @@ const normalizeCaregiverProfileResponse = (data: unknown): CaregiverProfileRespo
   const telefone = asNonEmptyString(parsedData.telefone);
 
   if (!id || !nomeCompleto || !relacao || !telefone) {
-    throw new Error("Resposta de cuidador invalida.");
+    throw new Error("Resposta de cuidador inválida.");
   }
 
   return {
@@ -61,7 +62,7 @@ export const fetchCurrentCaregiverProfile = async (): Promise<CaregiverProfileRe
       const status = error.response?.status;
 
       if (status === 404) {
-        throw new Error("Cuidador não encontrado.");
+        throw new FriendlyError("Não encontramos os dados do cuidador.");
       }
 
       if (status === 400) {
@@ -69,10 +70,10 @@ export const fetchCurrentCaregiverProfile = async (): Promise<CaregiverProfileRe
       }
 
       if (!status) {
-        throw new Error("Não foi possível conectar com a API de cuidadores.");
+        throw new FriendlyError(ERROR_MESSAGES.network);
       }
 
-      throw new Error(`Falha ao carregar perfil do cuidador (HTTP ${status}).`);
+      throw new FriendlyError("Não foi possível carregar o seu perfil agora. Tente de novo.");
     }
 
     throw error;

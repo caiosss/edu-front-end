@@ -3,6 +3,7 @@ import type { PatientProfileResponse } from "../features/profile/types";
 import { useAuthStore } from "../store/auth-store";
 import { getPacienteIdFromToken } from "../utils/jwt";
 import { api } from "./api";
+import { ERROR_MESSAGES, FriendlyError } from "../utils/friendly-error";
 
 const asNonEmptyString = (value: unknown): string | null => {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
@@ -25,7 +26,7 @@ const asStringArray = (value: unknown): string[] => {
  */
 const normalizePatientProfileResponse = (data: unknown): PatientProfileResponse => {
   if (!data || typeof data !== "object") {
-    throw new Error("Resposta de paciente invalida.");
+    throw new Error("Resposta de paciente inválida.");
   }
 
   const parsedData = data as {
@@ -41,7 +42,7 @@ const normalizePatientProfileResponse = (data: unknown): PatientProfileResponse 
   const nomeCompleto = asNonEmptyString(parsedData.nomeCompleto);
 
   if (!id || !nomeCompleto) {
-    throw new Error("Resposta de paciente invalida.");
+    throw new Error("Resposta de paciente inválida.");
   }
 
   return {
@@ -62,18 +63,18 @@ export const fetchCurrentPatientProfile = async (): Promise<PatientProfileRespon
       const status = error.response?.status;
 
       if (status === 404) {
-        throw new Error("Paciente nao encontrado.");
+        throw new FriendlyError("Não encontramos os dados do paciente.");
       }
 
       if (status === 400) {
-        throw new Error("ID de paciente invalido.");
+        throw new Error("ID de paciente inválido.");
       }
 
       if (!status) {
-        throw new Error("Nao foi possivel conectar com a API de pacientes.");
+        throw new FriendlyError(ERROR_MESSAGES.network);
       }
 
-      throw new Error(`Falha ao carregar perfil do paciente (HTTP ${status}).`);
+      throw new FriendlyError("Não foi possível carregar o seu perfil agora. Tente de novo.");
     }
 
     throw error;
@@ -85,13 +86,13 @@ export const fetchCurrentPatientId = async (): Promise<string> => {
     const response = await api.get("/pacientes/me");
 
     if (!response.data || typeof response.data !== "object") {
-      throw new Error("Resposta de paciente invalida.");
+      throw new Error("Resposta de paciente inválida.");
     }
 
     const patientId = asNonEmptyString((response.data as { id?: unknown }).id);
 
     if (!patientId) {
-      throw new Error("Resposta de paciente invalida: id ausente.");
+      throw new Error("Resposta de paciente inválida: id ausente.");
     }
 
     return patientId;
@@ -100,18 +101,18 @@ export const fetchCurrentPatientId = async (): Promise<string> => {
       const status = error.response?.status;
 
       if (status === 404) {
-        throw new Error("Paciente da sessao nao encontrado.");
+        throw new FriendlyError("Não encontramos os dados do paciente.");
       }
 
       if (status === 401 || status === 403) {
-        throw new Error("Sessao sem permissao para acessar o paciente.");
+        throw new FriendlyError(ERROR_MESSAGES.session);
       }
 
       if (!status) {
-        throw new Error("Nao foi possivel conectar com a API de pacientes.");
+        throw new FriendlyError(ERROR_MESSAGES.network);
       }
 
-      throw new Error(`Falha ao identificar o paciente (HTTP ${status}).`);
+      throw new FriendlyError("Não foi possível identificar o paciente agora. Tente de novo.");
     }
 
     throw error;

@@ -42,7 +42,7 @@ export function AchievementsCard({ recentes, todas, onSeeAll }: AchievementsCard
           hitSlop={8}
           style={styles.seeAll}
         >
-          <Text style={styles.seeAllText}>ver todas</Text>
+          <Text style={styles.seeAllText}>Ver todas</Text>
           <ChevronRight size={16} color="#1A5DB5" />
         </Pressable>
       </View>

@@ -145,7 +145,7 @@ export function PackBagRound({ rodada, onFinish, onExit }: PackBagRoundProps) {
           hitSlop={10}
           style={styles.exitButton}
         >
-          <X size={22} color="#35506B" />
+          <X size={26} color="#35506B" />
         </Pressable>
         <View style={styles.headerProgress}>
           <Text style={styles.progressLabel}>
@@ -302,7 +302,7 @@ export function PackBagRound({ rodada, onFinish, onExit }: PackBagRoundProps) {
         >
           <Luggage size={20} color="#FFFFFF" />
           <Text style={styles.finishText}>
-            {fase === "lembretes" && faltando.length === 0 ? "Pronto, viajar" : "Fechar a mala"}
+            {fase === "lembretes" && faltando.length === 0 ? "Pronto, vamos viajar!" : "Fechar a mala"}
           </Text>
         </Pressable>
       </View>
@@ -311,7 +311,7 @@ export function PackBagRound({ rodada, onFinish, onExit }: PackBagRoundProps) {
         <ConfettiBurst
           burstKey={burstKey}
           origin={{ x: width / 2, y: 240 }}
-          count={26}
+          count={14}
           colors={FECHOU_COLORS}
           spread={360}
           power={FECHOU_POWER}
@@ -336,8 +336,8 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   exitButton: {
-    width: 44,
-    height: 44,
+    width: 52,
+    height: 52,
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
   },
   progressLabel: {
     color: "#35506B",
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: "700",
   },
   content: {
@@ -359,9 +359,9 @@ const styles = StyleSheet.create({
   },
   instruction: {
     color: "#12314C",
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: "800",
-    lineHeight: 24,
+    lineHeight: 27,
   },
   bag: {
     borderRadius: 20,
@@ -382,18 +382,18 @@ const styles = StyleSheet.create({
   bagTitle: {
     flex: 1,
     color: "#7A4100",
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "800",
   },
   bagCount: {
     color: "#8A4B06",
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: "800",
   },
   bagEmpty: {
     color: "#8A4B06",
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 17,
+    lineHeight: 24,
   },
   bagItems: {
     flexDirection: "row",
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   bagChip: {
-    minHeight: 36,
+    minHeight: 48,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
   },
   bagChipText: {
     color: "#7A4100",
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: "800",
     maxWidth: 150,
   },
@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
   reminderTitle: {
     flex: 1,
     color: "#4527A0",
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: "800",
   },
   reminderTitleGood: {
@@ -438,13 +438,13 @@ const styles = StyleSheet.create({
   },
   reminderText: {
     color: "#3B2A77",
-    fontSize: 15,
-    lineHeight: 21,
+    fontSize: 18,
+    lineHeight: 25,
     fontWeight: "600",
   },
   shelfTitle: {
     color: "#4F6982",
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: "800",
     letterSpacing: 0.8,
     textTransform: "uppercase",
@@ -490,10 +490,10 @@ const styles = StyleSheet.create({
   },
   shelfLabel: {
     color: "#23405C",
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: "700",
     textAlign: "center",
-    lineHeight: 17,
+    lineHeight: 21,
   },
   shelfCheck: {
     position: "absolute",
@@ -512,7 +512,7 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
   },
   finishButton: {
-    minHeight: 54,
+    minHeight: 56,
     borderRadius: 16,
     flexDirection: "row",
     alignItems: "center",
@@ -528,7 +528,7 @@ const styles = StyleSheet.create({
   },
   finishText: {
     color: "#FFFFFF",
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: "800",
   },
 });

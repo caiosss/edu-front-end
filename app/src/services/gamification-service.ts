@@ -14,6 +14,7 @@ import type {
   Streak,
 } from "../features/gamification/types";
 import { api, extractApiErrorMessage } from "./api";
+import { ERROR_MESSAGES, FriendlyError } from "../utils/friendly-error";
 
 const asObject = (value: unknown): Record<string, unknown> | null => {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -41,7 +42,7 @@ const normalizeNivel = (data: Record<string, unknown>, atualKey: string): Nivel 
   const xpParaProximo = asNumber(data.xpParaProximo);
 
   if (atual === null || xpNoNivel === null || xpParaProximo === null) {
-    throw new Error("Resposta de gamificacao invalida: nivel ausente.");
+    throw new Error("Resposta de gamificação inválida: nível ausente.");
   }
 
   return {
@@ -173,15 +174,20 @@ const toGamificationError = (error: unknown, action: string): Error => {
     const status = error.response?.status;
 
     if (!status) {
-      return new Error("Não foi possível conectar com a API de progresso.");
+      return new FriendlyError(ERROR_MESSAGES.network);
     }
 
     if (status === 401 || status === 403) {
-      return new Error(`Sessão sem permissão para ${action}.`);
+      return new FriendlyError(ERROR_MESSAGES.session);
     }
 
-    return new Error(
-      extractApiErrorMessage(error.response?.data) ?? `Falha ao ${action} (HTTP ${status}).`
+    if (status >= 500) {
+      return new FriendlyError(ERROR_MESSAGES.server);
+    }
+
+    return new FriendlyError(
+      extractApiErrorMessage(error.response?.data) ??
+        `Não foi possível ${action} agora. Tente de novo.`
     );
   }
 
@@ -196,7 +202,7 @@ export const fetchGamificationProfile = async (): Promise<GamificationProfile> =
     const xpTotal = asNumber(perfil?.xpTotal);
 
     if (!perfil || xpTotal === null) {
-      throw new Error("Resposta de perfil de progresso invalida.");
+      throw new Error("Resposta de perfil de progresso inválida.");
     }
 
     return {
@@ -216,7 +222,7 @@ export const fetchGamificationAchievements = async (): Promise<Conquista[]> => {
     const response = await api.get("/gamification/conquistas");
 
     if (!Array.isArray(response.data)) {
-      throw new Error("Resposta de conquistas invalida.");
+      throw new Error("Resposta de conquistas inválida.");
     }
 
     return response.data
@@ -237,7 +243,7 @@ export const fetchProgressSummary = async (
     const nivel = asObject(resumo?.nivel);
 
     if (!resumo || !nivel) {
-      throw new Error("Resposta de resumo de progresso invalida.");
+      throw new Error("Resposta de resumo de progresso inválida.");
     }
 
     return {
@@ -272,7 +278,7 @@ export const fetchRewardStatement = async (page: number): Promise<ExtratoPagina>
     const pagina = asObject(response.data);
 
     if (!pagina || !Array.isArray(pagina.content)) {
-      throw new Error("Resposta de extrato invalida.");
+      throw new Error("Resposta de extrato inválida.");
     }
 
     const linhas = pagina.content

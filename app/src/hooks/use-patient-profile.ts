@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { PatientProfileResponse } from "../features/profile/types";
 import { useAuthStore } from "../store/auth-store";
 import { fetchCurrentPatientProfile } from "../services/patient-service";
+import { ERROR_MESSAGES, toFriendlyMessage } from "../utils/friendly-error";
 
 type UsePatientProfileOptions = {
   enabled?: boolean;
@@ -34,7 +35,7 @@ export function usePatientProfile(
 
     if (!token) {
       setPatientProfile(null);
-      setErrorMessage("Sessao nao autenticada para carregar o paciente.");
+      setErrorMessage(ERROR_MESSAGES.session);
       return;
     }
 
@@ -47,9 +48,7 @@ export function usePatientProfile(
     } catch (error) {
       setPatientProfile(null);
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Nao foi possivel carregar o perfil do paciente."
+        toFriendlyMessage(error, "Não foi possível carregar o seu perfil.")
       );
     } finally {
       setIsLoading(false);

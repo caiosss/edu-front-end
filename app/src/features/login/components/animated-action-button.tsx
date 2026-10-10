@@ -82,7 +82,7 @@ export function AnimatedActionButton({
 
 const styles = StyleSheet.create({
   button: {
-    minHeight: 50,
+    minHeight: 56,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F9FBFE",
   },
   label: {
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: "700",
   },
   primaryLabel: {

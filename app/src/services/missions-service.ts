@@ -14,6 +14,7 @@ import type {
 } from "../features/home/types";
 import { api, extractApiErrorMessage } from "./api";
 import { resolveCurrentPatientId } from "./patient-service";
+import { ERROR_MESSAGES, FriendlyError } from "../utils/friendly-error";
 
 const asNonEmptyString = (value: unknown): string | null => {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
@@ -50,14 +51,14 @@ const normalizePlanItems = (data: unknown): GeneralMissionResponse[] => {
   const plano = asObject(data);
 
   if (!plano) {
-    throw new Error("Resposta de planos de missoes invalida.");
+    throw new Error("Resposta de planos de missões inválida.");
   }
 
   const planoId = asNonEmptyString(plano.id);
   const ativa = asBoolean(plano.ativa);
 
   if (!planoId || ativa === null || !Array.isArray(plano.itens)) {
-    throw new Error("Resposta de planos de missoes invalida.");
+    throw new Error("Resposta de planos de missões inválida.");
   }
 
   const planoNome = asString(plano.nome) ?? "";
@@ -71,7 +72,7 @@ const normalizePlanItems = (data: unknown): GeneralMissionResponse[] => {
     const nome = asNonEmptyString(item?.nomeMissao);
 
     if (!item || !id || !missaoId || !nome) {
-      throw new Error("Resposta de itens do plano de missoes invalida.");
+      throw new Error("Resposta de itens do plano de missões inválida.");
     }
 
     return {
@@ -95,14 +96,14 @@ const normalizePrescriptionItems = (data: unknown): MedicationMissionResponse[] 
   const prescricao = asObject(data);
 
   if (!prescricao) {
-    throw new Error("Resposta de prescricoes invalida.");
+    throw new Error("Resposta de prescrições inválida.");
   }
 
   const prescricaoId = asNonEmptyString(prescricao.id);
   const ativo = asBoolean(prescricao.ativo);
 
   if (!prescricaoId || ativo === null || !Array.isArray(prescricao.itens)) {
-    throw new Error("Resposta de prescricoes invalida.");
+    throw new Error("Resposta de prescrições inválida.");
   }
 
   const pacienteId = asString(prescricao.pacienteId) ?? "";
@@ -116,7 +117,7 @@ const normalizePrescriptionItems = (data: unknown): MedicationMissionResponse[] 
     const horarioPrimeiraDose = asNonEmptyString(item?.horarioPrimeiraDose);
 
     if (!item || !id || !nomeMedicamento || frequenciaHoras === null || !horarioPrimeiraDose) {
-      throw new Error("Resposta de itens de prescricao invalida.");
+      throw new Error("Resposta de itens de prescrição inválida.");
     }
 
     return {
@@ -140,7 +141,7 @@ const normalizeMyMissionsResponse = (data: unknown): MyMissionsResponse => {
   const parsedData = asObject(data);
 
   if (!parsedData || !Array.isArray(parsedData.planos) || !Array.isArray(parsedData.prescricoes)) {
-    throw new Error("Resposta de missoes invalida.");
+    throw new Error("Resposta de missões inválida.");
   }
 
   return {
@@ -174,7 +175,7 @@ const normalizeRecompensa = (data: unknown): Recompensa => {
   const recompensa = asObject(data);
 
   if (!recompensa) {
-    throw new Error("Resposta de conclusao invalida: recompensa ausente.");
+    throw new Error("Resposta de conclusão inválida: recompensa ausente.");
   }
 
   const regras: RegraAplicada[] = Array.isArray(recompensa.regras)
@@ -201,7 +202,7 @@ const normalizeNivel = (data: unknown): Nivel => {
   const xpParaProximo = asNonNegativeInteger(nivel?.xpParaProximo);
 
   if (atual === null || xpNoNivel === null || xpParaProximo === null) {
-    throw new Error("Resposta de conclusao invalida: nivel ausente.");
+    throw new Error("Resposta de conclusão inválida: nível ausente.");
   }
 
   return { atual: Math.max(1, atual), xpNoNivel, xpParaProximo };
@@ -212,7 +213,7 @@ const normalizeConclusaoResponse = (data: unknown): ConclusaoResponse => {
   const parsedData = asObject(data);
 
   if (!parsedData) {
-    throw new Error("Resposta de conclusao invalida.");
+    throw new Error("Resposta de conclusão inválida.");
   }
 
   return {
@@ -238,35 +239,37 @@ export const fetchMyMissions = async (): Promise<MyMissionsResponse> => {
       const status = error.response?.status;
 
       if (status === 401 || status === 403) {
-        throw new Error("Sessão sem permissão para carregar missões.");
+        throw new FriendlyError(ERROR_MESSAGES.session);
       }
 
       if (status === 404) {
-        throw new Error("Nenhuma missão encontrada para este usuário.");
+        throw new FriendlyError("Ainda não há medicamentos nem missões cadastrados para você.");
       }
 
       if (status === 400) {
-        throw new Error("Requisição invalida ao carregar missões.");
+        throw new Error("Requisição inválida ao carregar missões.");
       }
 
       if (status && status >= 500) {
-        throw new Error("A API retornou erro interno ao carregar missões.");
+        throw new FriendlyError(ERROR_MESSAGES.server);
       }
 
       if (!status) {
-        throw new Error("Não foi possível conectar com a API de missões.");
+        throw new FriendlyError(ERROR_MESSAGES.network);
       }
 
-      throw new Error(`Falha ao carregar missões (HTTP ${status}).`);
+      throw new FriendlyError(
+        "Não foi possível carregar seus medicamentos e missões agora. Tente de novo."
+      );
     }
 
     throw error;
   }
 };
 
-export class CompleteMissionNetworkError extends Error {
+export class CompleteMissionNetworkError extends FriendlyError {
   constructor() {
-    super("Não foi possível conectar com a API de missões.");
+    super(ERROR_MESSAGES.network);
     this.name = "CompleteMissionNetworkError";
   }
 }
@@ -285,7 +288,7 @@ export const completeMission = async (
   const prescricaoItemId = payload.prescricaoItemId?.trim() || null;
 
   if (!planoMissaoItemId && !prescricaoItemId) {
-    throw new Error("ID do item do plano ou da prescricao ausente.");
+    throw new Error("ID do item do plano ou da prescrição ausente.");
   }
 
   try {
@@ -306,26 +309,28 @@ export const completeMission = async (
       }
 
       if (status === 409) {
-        throw new Error(backendMessage ?? "Este registro já foi feito.");
+        throw new FriendlyError(backendMessage ?? "Este registro já foi feito.");
       }
 
       if (status === 401 || status === 403) {
-        throw new Error("Sessão sem permissão para concluir missão.");
+        throw new FriendlyError(ERROR_MESSAGES.session);
       }
 
       if (status === 404) {
-        throw new Error(backendMessage ?? "Missão não encontrada para conclusão.");
+        throw new FriendlyError(
+          backendMessage ?? "Não encontramos esse item no seu plano. Atualize a tela e tente de novo."
+        );
       }
 
       if (status === 400) {
-        throw new Error(backendMessage ?? "Requisição inválida ao concluir missão.");
+        throw new FriendlyError(backendMessage ?? "Não foi possível registrar agora. Tente de novo.");
       }
 
       if (status >= 500) {
-        throw new Error("A API retornou erro interno ao concluir missão.");
+        throw new FriendlyError(ERROR_MESSAGES.server);
       }
 
-      throw new Error(`Falha ao concluir missão (HTTP ${status}).`);
+      throw new FriendlyError("Não foi possível registrar agora. Tente de novo.");
     }
 
     throw error;

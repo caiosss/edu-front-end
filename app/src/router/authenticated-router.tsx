@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { BackHandler, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { CelebrationHost } from "../features/gamification/components/celebration-host";
@@ -24,6 +24,33 @@ export function AuthenticatedRouter() {
       authenticatedRoutes[0],
     [currentRouteKey]
   );
+
+  // O botao voltar do Android fecha a sobreposicao ou volta ao Inicio, em vez de fechar o app.
+  // Registrado uma unica vez: as telas registram depois e tem prioridade (rodadas, subtelas).
+  const navigationStateRef = useRef({ currentRouteKey, overlayRoute });
+  navigationStateRef.current = { currentRouteKey, overlayRoute };
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      const { currentRouteKey: routeKey, overlayRoute: overlay } = navigationStateRef.current;
+
+      if (overlay !== null) {
+        setOverlayRoute(null);
+        return true;
+      }
+
+      if (routeKey !== "inicio") {
+        setCurrentRouteKey("inicio");
+        return true;
+      }
+
+      return false;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   const ActiveScreen = activeRoute.component;
   const isOverlayVisible = overlayRoute !== null;

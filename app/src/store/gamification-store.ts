@@ -121,14 +121,17 @@ export const useGamificationStore = create<GamificationState>((set, get) => ({
     );
 
     // Na primeira leitura as conquistas ja existiam: so celebra o que destravar depois.
-    const events: CelebrationEvent[] = state.hasLoadedAchievements
-      ? conquistas
-          .filter(
-            (conquista) =>
-              conquista.desbloqueadaEm !== null && !jaDesbloqueadas.has(conquista.codigo)
-          )
-          .map((conquista) => ({ id: nextEventId(), kind: "achievement", conquista }))
+    const novas = state.hasLoadedAchievements
+      ? conquistas.filter(
+          (conquista) =>
+            conquista.desbloqueadaEm !== null && !jaDesbloqueadas.has(conquista.codigo)
+        )
       : [];
+    // Varias de uma vez viram um unico modal, para nao empilhar uma celebracao atras da outra.
+    const events: CelebrationEvent[] =
+      novas.length > 0
+        ? [{ id: nextEventId(), kind: "achievement", conquista: novas[0], outras: novas.length - 1 }]
+        : [];
 
     set({
       conquistas,
@@ -137,7 +140,7 @@ export const useGamificationStore = create<GamificationState>((set, get) => ({
         events.length > 0 ? [...state.celebrationQueue, ...events] : state.celebrationQueue,
     });
 
-    return events.length;
+    return novas.length;
   },
   dequeueCelebration: (id) =>
     set((state) =>

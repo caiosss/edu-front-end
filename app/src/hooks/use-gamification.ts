@@ -6,6 +6,7 @@ import {
 import { useAuthStore } from "../store/auth-store";
 import { useGamificationStore } from "../store/gamification-store";
 import { getPacienteIdFromToken } from "../utils/jwt";
+import { toFriendlyMessage } from "../utils/friendly-error";
 
 /**
  * O gamification-service concede XP e conquistas ao consumir os eventos de dominio (outbox ->
@@ -24,7 +25,7 @@ export const isPatientSession = (token: string | null, tipoUsuario: string | nul
   (Boolean(getPacienteIdFromToken(token)) || tipoUsuario?.toUpperCase() === "PACIENTE");
 
 const errorMessageOf = (error: unknown) =>
-  error instanceof Error ? error.message : "Nao foi possivel carregar seu progresso.";
+  toFriendlyMessage(error, "Não foi possível carregar o seu progresso.");
 
 export const cancelGamificationSync = () => {
   syncTimers.forEach(clearTimeout);

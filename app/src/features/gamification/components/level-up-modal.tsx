@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import {
+  AccessibilityInfo,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, {
   Easing,
@@ -20,9 +27,9 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Defs, Path, RadialGradient, Stop } from "react-native-svg";
 import { Crown } from "lucide-react-native";
-import { confettiPalette, goldGradient, goldPalette, levelUpBackdropGradient } from "../theme";
+import { goldGradient, goldPalette, levelUpBackdropGradient } from "../theme";
 import type { CelebrationEvent } from "../types";
-import { hapticImpact, hapticSuccess } from "../utils/haptics";
+import { hapticSuccess } from "../utils/haptics";
 import { ConfettiBurst } from "./confetti-burst";
 import { Sparkle } from "./sparkle";
 
@@ -35,18 +42,17 @@ type LevelUpModalProps = {
 
 const STAGE_SIZE = 240;
 const RAY_COUNT = 16;
-const CORNER_POWER = [760, 1180] as const;
-const RAIN_POWER = [60, 360] as const;
+/** Tempo na tela antes de fechar sozinho; o botao "Continuar" fecha antes. */
+const VISIBLE_MS = 12000;
+/** O brilho atras da medalha pulsa poucas vezes e para. */
+const GLOW_PULSES = 2;
 const MEDAL_BURST_POWER = [260, 540] as const;
 const MEDAL_INNER_GRADIENT = ["#F59F00", "#E8590C"] as const;
 
 const SPARKLES = [
   { x: 28, y: 52, size: 16, delay: 300 },
-  { x: 210, y: 40, size: 14, delay: 650 },
   { x: 222, y: 170, size: 18, delay: 450 },
-  { x: 20, y: 184, size: 12, delay: 900 },
-  { x: 120, y: 6, size: 12, delay: 1100 },
-  { x: 118, y: 236, size: 14, delay: 780 },
+  { x: 120, y: 6, size: 12, delay: 700 },
 ];
 
 export function LevelUpModal({ event, onDone }: LevelUpModalProps) {
@@ -57,14 +63,11 @@ export function LevelUpModal({ event, onDone }: LevelUpModalProps) {
   const medal = useSharedValue(0);
   const rays = useSharedValue(0);
   const glow = useSharedValue(0);
-  const breathe = useSharedValue(0);
   const closingRef = useRef(false);
   const reduceMotion = useReducedMotion();
 
   const [shownLevel, setShownLevel] = useState(event.de);
-  const [cornerBurstKey, setCornerBurstKey] = useState(0);
   const [medalBurstKey, setMedalBurstKey] = useState(0);
-  const [rainBurstKey, setRainBurstKey] = useState(0);
 
   const raySize = Math.max(width, height) * 1.1;
 
@@ -96,9 +99,12 @@ export function LevelUpModal({ event, onDone }: LevelUpModalProps) {
 
   // Roda uma vez por evento: o host remonta o componente pela `key` do evento.
   useEffect(() => {
-    hapticImpact("heavy");
+    hapticSuccess();
+    AccessibilityInfo.announceForAccessibility(
+      `Você subiu de nível! Agora você está no nível ${event.para}.`
+    );
     backdrop.value = withTiming(1, { duration: 320 });
-    medal.value = withDelay(160, withSpring(1, { damping: 7, stiffness: 110 }));
+    medal.value = withDelay(160, withSpring(1, { damping: 12, stiffness: 110 }));
     if (!reduceMotion) {
       rays.value = withRepeat(withTiming(1, { duration: 16000, easing: Easing.linear }), -1, false);
     }
@@ -107,37 +113,22 @@ export function LevelUpModal({ event, onDone }: LevelUpModalProps) {
         withTiming(1, { duration: 1100, easing: Easing.inOut(Easing.sin) }),
         withTiming(0, { duration: 1100, easing: Easing.inOut(Easing.sin) })
       ),
-      -1,
+      GLOW_PULSES,
       false
-    );
-    breathe.value = withDelay(
-      1400,
-      withRepeat(
-        withSequence(withTiming(1, { duration: 700 }), withTiming(0, { duration: 700 })),
-        -1,
-        false
-      )
     );
 
     const timers = [
       setTimeout(() => {
-        setCornerBurstKey(Date.now());
-        hapticSuccess();
-      }, 280),
-      setTimeout(() => {
         setShownLevel(event.para);
         setMedalBurstKey(Date.now());
-        hapticImpact("heavy");
       }, 950),
-      setTimeout(() => setRainBurstKey(Date.now()), 1150),
-      setTimeout(close, 9000),
+      setTimeout(close, VISIBLE_MS),
     ];
 
     return () => {
       timers.forEach(clearTimeout);
       cancelAnimation(rays);
       cancelAnimation(glow);
-      cancelAnimation(breathe);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -160,16 +151,13 @@ export function LevelUpModal({ event, onDone }: LevelUpModalProps) {
 
   const medalStyle = useAnimatedStyle(() => ({
     opacity: Math.min(1, medal.value * 2),
-    transform: [{ scale: medal.value }, { rotate: `${(1 - medal.value) * -25}deg` }],
+    transform: [{ scale: medal.value }],
   }));
 
   const contentStyle = useAnimatedStyle(() => ({
     opacity: backdrop.value,
   }));
 
-  const buttonStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 1 + breathe.value * 0.05 }],
-  }));
 
   return (
     <View style={StyleSheet.absoluteFill}>
@@ -258,7 +246,7 @@ export function LevelUpModal({ event, onDone }: LevelUpModalProps) {
           <ConfettiBurst
             burstKey={medalBurstKey}
             origin={{ x: STAGE_SIZE / 2, y: STAGE_SIZE / 2 }}
-            count={40}
+            count={28}
             colors={goldPalette}
             spread={360}
             power={MEDAL_BURST_POWER}
@@ -278,7 +266,7 @@ export function LevelUpModal({ event, onDone }: LevelUpModalProps) {
         </Animated.Text>
 
         <Animated.View entering={FadeInUp.delay(820).springify().damping(12)}>
-          <Animated.View style={buttonStyle}>
+          <View>
             <Pressable
               onPress={close}
               accessibilityRole="button"
@@ -293,43 +281,10 @@ export function LevelUpModal({ event, onDone }: LevelUpModalProps) {
                 <Text style={styles.buttonText}>Continuar</Text>
               </LinearGradient>
             </Pressable>
-          </Animated.View>
+          </View>
         </Animated.View>
       </Animated.View>
 
-      <ConfettiBurst
-        burstKey={cornerBurstKey}
-        origin={{ x: 0, y: height * 0.92 }}
-        count={36}
-        direction={-62}
-        spread={34}
-        power={CORNER_POWER}
-        gravity={950}
-        duration={2500}
-        colors={confettiPalette}
-      />
-      <ConfettiBurst
-        burstKey={cornerBurstKey}
-        origin={{ x: width, y: height * 0.92 }}
-        count={36}
-        direction={-118}
-        spread={34}
-        power={CORNER_POWER}
-        gravity={950}
-        duration={2500}
-        colors={confettiPalette}
-      />
-      <ConfettiBurst
-        burstKey={rainBurstKey}
-        origin={{ x: width / 2, y: -24 }}
-        count={44}
-        direction={90}
-        spread={170}
-        power={RAIN_POWER}
-        gravity={420}
-        duration={3000}
-        colors={confettiPalette}
-      />
     </View>
   );
 }
@@ -391,13 +346,13 @@ const styles = StyleSheet.create({
   },
   levelCaption: {
     color: "#FFF3BF",
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: "900",
     letterSpacing: 2,
   },
   title: {
     color: "#FFFFFF",
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: "900",
     textAlign: "center",
     textShadowColor: "rgba(255, 212, 59, 0.5)",
@@ -405,9 +360,9 @@ const styles = StyleSheet.create({
     textShadowRadius: 18,
   },
   subtitle: {
-    color: "#D0E2F5",
-    fontSize: 15,
-    lineHeight: 22,
+    color: "#E3EEFA",
+    fontSize: 19,
+    lineHeight: 27,
     textAlign: "center",
     maxWidth: 340,
   },
@@ -421,8 +376,8 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   button: {
-    minWidth: 220,
-    minHeight: 52,
+    minWidth: 240,
+    minHeight: 60,
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
@@ -430,7 +385,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: "#5C2E00",
-    fontSize: 16,
+    fontSize: 19,
     fontWeight: "900",
     letterSpacing: 0.4,
   },

@@ -2,9 +2,9 @@ import { z } from "zod";
 import { isBeforeDate, isDateInFuture, parseDateInputToDate } from "./utils/date";
 import { USER_TYPES, type RegistrationFormValues, type UserType } from "./types";
 
-const requiredFieldMessage = "Campo obrigatorio.";
-const validDateMessage = "Informe uma data valida no formato DD/MM/AAAA.";
-const validUserTypeMessage = "Selecione um tipo de usuario valido.";
+const requiredFieldMessage = "Preencha este campo.";
+const validDateMessage = "Informe uma data válida, no formato DD/MM/AAAA.";
+const validUserTypeMessage = "Escolha se você é paciente ou cuidador.";
 const userTypeSet = new Set<UserType>(USER_TYPES);
 
 const hasValue = (value: string): boolean => value.trim().length > 0;
@@ -45,7 +45,7 @@ const validateDateField = (
     context.addIssue({
       code: z.ZodIssueCode.custom,
       path: [path],
-      message: `${label} nao pode ser no futuro.`,
+      message: `${label} não pode ser depois de hoje.`,
     });
     return false;
   }
@@ -55,13 +55,13 @@ const validateDateField = (
 
 export const registrationSchema = z
   .object({
-    email: z.string().trim().email("Informe um e-mail valido."),
+    email: z.string().trim().email("Informe um e-mail válido."),
     senha: z
       .string()
-      .min(8, "A senha deve ter no minimo 8 caracteres.")
-      .regex(/[A-Z]/, "A senha precisa de ao menos 1 letra maiuscula.")
-      .regex(/[a-z]/, "A senha precisa de ao menos 1 letra minuscula.")
-      .regex(/[0-9]/, "A senha precisa de ao menos 1 numero."),
+      .min(8, "A senha precisa ter pelo menos 8 caracteres.")
+      .regex(/[A-Z]/, "A senha precisa ter pelo menos 1 letra maiúscula.")
+      .regex(/[a-z]/, "A senha precisa ter pelo menos 1 letra minúscula.")
+      .regex(/[0-9]/, "A senha precisa ter pelo menos 1 número."),
     tipoUsuario: z.string(),
     pacienteCpf: z.string(),
     pacienteNomeCompleto: z.string(),
@@ -95,7 +95,7 @@ export const registrationSchema = z
           context.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["pacienteCpf"],
-            message: "Informe um CPF valido com 11 digitos.",
+            message: "Informe um CPF válido, com 11 dígitos.",
           });
         }
       }
@@ -129,7 +129,7 @@ export const registrationSchema = z
         context.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["pacienteDataTransplante"],
-          message: "A data do transplante deve ser posterior a data de nascimento.",
+          message: "A data do transplante precisa ser depois da data de nascimento.",
         });
       }
     }
@@ -151,7 +151,7 @@ export const registrationSchema = z
           context.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["cuidadorTelefone"],
-            message: "Informe um telefone valido com DDD.",
+            message: "Informe um telefone válido, com DDD.",
           });
         }
       }
@@ -197,12 +197,12 @@ export const isUserType = (value: string): value is UserType => {
 
 export const getStepTitles = (userType: UserType | ""): [string, string] => {
   if (userType === "PACIENTE") {
-    return ["Credenciais", "Dados do Paciente"];
+    return ["Dados de acesso", "Dados do paciente"];
   }
 
   if (userType === "CUIDADOR") {
-    return ["Credenciais", "Dados do Cuidador"];
+    return ["Dados de acesso", "Dados do cuidador"];
   }
 
-  return ["Credenciais", "Confirmacao"];
+  return ["Dados de acesso", "Confirmação"];
 };
