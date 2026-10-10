@@ -1,0 +1,484 @@
+import React, { useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
+import { Bell, Eye, Flame, Gem, Heart, LogOut, Medal, Settings, UserRound } from "lucide-react-native";
+import { AnimatedXpBar } from "../features/gamification/components/animated-xp-bar";
+import { LevelRing } from "../features/gamification/components/level-ring";
+import { nivelRatio } from "../features/gamification/utils/level";
+import SettingItem from "../features/navigation/components/settings-item";
+import { useAuth } from "../hooks/useAuth";
+import { useCaregiverProfile } from "../hooks/use-caregiver-profile";
+import { usePatientProfile } from "../hooks/use-patient-profile";
+import { useGamification } from "../hooks/use-gamification";
+
+const parseDate = (value: string): Date | null => {
+  const parsedDate = new Date(value);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return null;
+  }
+
+  return parsedDate;
+};
+
+const formatDate = (value: string): string => {
+  const parsedDate = parseDate(value);
+
+  if (!parsedDate) {
+    return "Não informado";
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(parsedDate);
+};
+
+type ProfileInfoRowProps = {
+  label: string;
+  value: string;
+};
+
+type ProfileScreenProps = {
+  onNavigateToAddCaregiver?: () => void;
+};
+
+function ProfileInfoRow({ label, value }: ProfileInfoRowProps) {
+  return (
+    <View style={styles.infoRow}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={styles.infoValue}>{value}</Text>
+    </View>
+  );
+}
+
+export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScreenProps) {
+  const { tipoUsuario, clearToken } = useAuth();
+  const isCaregiverUser = tipoUsuario === "CUIDADOR";
+
+  const {
+    patientProfile,
+    isLoading: isPatientLoading,
+    errorMessage: patientErrorMessage,
+    refreshPatientProfile,
+  } = usePatientProfile({ enabled: !isCaregiverUser });
+
+  const {
+    caregiverProfile,
+    isLoading: isCaregiverLoading,
+    errorMessage: caregiverErrorMessage,
+    refreshCaregiverProfile,
+  } = useCaregiverProfile({ enabled: isCaregiverUser });
+
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [accessibilityEnabled, setAccessibilityEnabled] = useState(false);
+  // Progresso vem do gamification-service; o `/pacientes/me` so traz os dados cadastrais.
+  const { nivel: patientNivel, xpTotal, moedas, streak } = useGamification();
+
+  const isProfileLoading = isCaregiverUser ? isCaregiverLoading : isPatientLoading;
+  const profileErrorMessage = isCaregiverUser ? caregiverErrorMessage : patientErrorMessage;
+  const hasProfileData = isCaregiverUser
+    ? Boolean(caregiverProfile)
+    : Boolean(patientProfile);
+
+  const refreshProfile = isCaregiverUser
+    ? refreshCaregiverProfile
+    : refreshPatientProfile;
+
+  const caregiverNames = patientProfile?.nomeCuidadores ?? [];
+  const patientNames = caregiverProfile?.nomePacientes ?? [];
+
+  const patientXpTotal = xpTotal ?? 0;
+
+  const accessibilityDescription = useMemo(
+    () =>
+      accessibilityEnabled
+        ? "Contraste elevado e apoio visual habilitados."
+        : "Ative para deixar a leitura e a navegação mais fáceis.",
+    [accessibilityEnabled]
+  );
+
+  return (
+    <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      {isProfileLoading && !hasProfileData ? (
+        <Animated.View entering={FadeInDown.duration(220)} style={styles.card}>
+          <View style={styles.loadingBlock}>
+            <ActivityIndicator size="small" color="#2C7BE5" />
+            <Text style={styles.supportingText}>
+              {isCaregiverUser
+                ? "Carregando dados do cuidador..."
+                : "Carregando dados do paciente..."}
+            </Text>
+          </View>
+        </Animated.View>
+      ) : null}
+
+      {profileErrorMessage && !hasProfileData ? (
+        <Animated.View entering={FadeInDown.duration(220)} style={styles.card}>
+          <Text style={styles.errorText}>{profileErrorMessage}</Text>
+          <Pressable onPress={() => void refreshProfile()} style={styles.retryButton}>
+            <Text style={styles.retryButtonText}>Tentar novamente</Text>
+          </Pressable>
+        </Animated.View>
+      ) : null}
+
+      {isCaregiverUser && caregiverProfile ? (
+        <>
+          <Animated.View entering={FadeInDown.duration(220)} style={styles.card}>
+            <View style={styles.mainIconBadge}>
+              <UserRound size={34} color="#2C7BE5" />
+            </View>
+
+            <Text style={styles.mainName}>{caregiverProfile.nomeCompleto}</Text>
+
+            <View style={styles.metaGroup}>
+              <ProfileInfoRow label="Parentesco" value={caregiverProfile.relacao} />
+              <ProfileInfoRow label="Telefone" value={caregiverProfile.telefone} />
+            </View>
+          </Animated.View>
+
+          {patientNames.length > 0 ? (
+            <Animated.View entering={FadeInDown.delay(80).duration(230)} style={styles.card}>
+              <View style={styles.cardHeader}>
+                <View style={styles.headerLeft}>
+                  <Heart size={18} color="#2C7BE5" />
+                  <Text style={styles.cardTitle}>Pacientes</Text>
+                </View>
+              </View>
+              <View style={styles.caregiverNamesList}>
+                {patientNames.map((nome, index) => (
+                  <View key={`${nome}-${index}`} style={styles.infoRow}>
+                    <Text style={styles.infoValue}>{nome}</Text>
+                  </View>
+                ))}
+              </View>
+            </Animated.View>
+          ) : null}
+        </>
+      ) : null}
+
+      {!isCaregiverUser && patientProfile ? (
+        <>
+          <Animated.View entering={FadeInDown.duration(220)} style={styles.card}>
+            <View style={styles.mainIconBadge}>
+              <UserRound size={34} color="#2C7BE5" />
+            </View>
+
+            <Text style={styles.mainName}>{patientProfile.nomeCompleto}</Text>
+
+            <View style={styles.metaGroup}>
+              <ProfileInfoRow
+                label="Tipo do transplante"
+                value={patientProfile.tipoTransplante || "Não informado"}
+              />
+              <ProfileInfoRow
+                label="Data do transplante"
+                value={formatDate(patientProfile.dataTransplante)}
+              />
+            </View>
+          </Animated.View>
+
+          <Animated.View entering={FadeInDown.delay(80).duration(230)} style={styles.card}>
+            <View style={styles.cardHeader}>
+              <View style={styles.headerLeft}>
+                <Medal size={18} color="#2C7BE5" />
+                <Text style={styles.cardTitle}>Conquistas e progresso</Text>
+              </View>
+              <Text style={styles.levelBadge}>Nível {patientNivel?.atual ?? 1}</Text>
+            </View>
+
+            <View style={styles.progressRow}>
+              <LevelRing nivel={patientNivel} size={60} strokeWidth={6} delay={200} />
+              <View style={styles.progressInfo}>
+                <AnimatedXpBar
+                  ratio={nivelRatio(patientNivel)}
+                  levelKey={patientNivel?.atual}
+                  delay={260}
+                />
+                <Text style={styles.supportingText}>
+                  {patientXpTotal} XP no total
+                  {patientNivel
+                    ? ` · faltam ${patientNivel.xpParaProximo} XP para o nível ${
+                        patientNivel.atual + 1
+                      }`
+                    : ""}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.chipRow}>
+              <View style={styles.coinChip}>
+                <Gem size={14} color="#845EF7" />
+                <Text style={styles.coinText}>{moedas} moedas</Text>
+              </View>
+              {streak && streak.atual > 0 ? (
+                <View style={styles.streakChip}>
+                  <Flame size={14} color="#E8590C" />
+                  <Text style={styles.streakText}>
+                    Sequência: {streak.atual} {streak.atual === 1 ? "dia" : "dias"}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          </Animated.View>
+
+          {caregiverNames.length > 0 ? (
+            <Animated.View entering={FadeInDown.delay(80).duration(230)} style={styles.card}>
+              <View style={styles.cardHeader}>
+                <View style={styles.headerLeft}>
+                  <Heart size={18} color="#2C7BE5" />
+                  <Text style={styles.cardTitle}>Cuidadores</Text>
+                </View>
+              </View>
+              <View style={styles.caregiverNamesList}>
+                {caregiverNames.map((nome, index) => (
+                  <View key={`${nome}-${index}`} style={styles.infoRow}>
+                    <Text style={styles.infoValue}>{nome}</Text>
+                  </View>
+                ))}
+              </View>
+            </Animated.View>
+          ) : null}
+        </>
+      ) : null}
+
+      {!isCaregiverUser && onNavigateToAddCaregiver ? (
+        <Pressable
+          onPress={onNavigateToAddCaregiver}
+          style={styles.addCaregiverButton}
+          android_ripple={{ color: "rgba(255, 255, 255, 0.22)", borderless: false }}
+        >
+          <Text style={styles.addCaregiverButtonText}>Adicionar cuidador</Text>
+        </Pressable>
+      ) : null}
+
+      <Animated.View entering={FadeInDown.delay(180).duration(250)} style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={styles.headerLeft}>
+            <Settings size={18} color="#2C7BE5" />
+            <Text style={styles.cardTitle}>Configurações</Text>
+          </View>
+        </View>
+
+        <View style={styles.settingsGroup}>
+          <SettingItem
+            label="Preferências de notificação"
+            description="Receba lembretes sobre medicamentos e missões."
+            value={notificationsEnabled}
+            onValueChange={setNotificationsEnabled}
+            Icon={Bell}
+          />
+
+          <SettingItem
+            label="Configurações de acessibilidade"
+            description={accessibilityDescription}
+            value={accessibilityEnabled}
+            onValueChange={setAccessibilityEnabled}
+            Icon={Eye}
+          />
+        </View>
+      </Animated.View>
+
+      <Pressable
+        onPress={clearToken}
+        style={styles.logoutButton}
+        android_ripple={{ color: "rgba(255, 255, 255, 0.22)", borderless: false }}
+      >
+        <LogOut size={16} color="#FFFFFF" />
+        <Text style={styles.logoutText}>Sair da conta</Text>
+      </Pressable>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 24,
+    gap: 14,
+  },
+  card: {
+    borderRadius: 18,
+    padding: 16,
+    backgroundColor: "#FDFEFF",
+    shadowColor: "#173B5D",
+    shadowOpacity: 0.07,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 3,
+    gap: 12,
+  },
+  loadingBlock: {
+    minHeight: 56,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  errorText: {
+    color: "#9B2F2F",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  retryButton: {
+    minHeight: 40,
+    borderRadius: 10,
+    backgroundColor: "#2C7BE5",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  retryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  mainIconBadge: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignSelf: "center",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#E8F2FF",
+  },
+  mainName: {
+    textAlign: "center",
+    color: "#11314D",
+    fontSize: 20,
+    fontWeight: "700",
+  },
+  metaGroup: {
+    gap: 8,
+  },
+  infoRow: {
+    borderRadius: 10,
+    backgroundColor: "#F4F8FC",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 3,
+  },
+  infoLabel: {
+    color: "#5B738A",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  infoValue: {
+    color: "#17324D",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#12314C",
+  },
+  levelBadge: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#1A6FD6",
+    backgroundColor: "#E6F1FF",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  progressRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  progressInfo: {
+    flex: 1,
+    gap: 6,
+  },
+  chipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  streakChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: "#FFF4E6",
+  },
+  streakText: {
+    color: "#7A3E00",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  coinChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: "#F3F0FF",
+  },
+  coinText: {
+    color: "#5F3DC4",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  supportingText: {
+    color: "#35506B",
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  settingsGroup: {
+    gap: 8,
+  },
+  caregiverNamesList: {
+    gap: 8,
+  },
+  addCaregiverButton: {
+    minHeight: 44,
+    borderRadius: 12,
+    backgroundColor: "#2C7BE5",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 14,
+  },
+  addCaregiverButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  logoutButton: {
+    minHeight: 44,
+    borderRadius: 12,
+    backgroundColor: "#2C7BE5",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  logoutText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+});
