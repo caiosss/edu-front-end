@@ -61,7 +61,7 @@ function ProfileInfoRow({ label, value }: ProfileInfoRowProps) {
 }
 
 export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScreenProps) {
-  const { tipoUsuario, clearToken } = useAuth();
+  const { tipoUsuario, logout } = useAuth();
   const isCaregiverUser = tipoUsuario === "CUIDADOR";
 
   const {
@@ -288,7 +288,7 @@ export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScree
       </Animated.View>
 
       <Pressable
-        onPress={clearToken}
+        onPress={logout}
         style={styles.logoutButton}
         android_ripple={{ color: "rgba(255, 255, 255, 0.22)", borderless: false }}
       >

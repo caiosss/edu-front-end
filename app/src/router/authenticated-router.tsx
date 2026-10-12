@@ -4,6 +4,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { CelebrationHost } from "../features/gamification/components/celebration-host";
 import { AuthToolbar } from "../features/navigation/components/auth-toolbar";
+import { PushPermissionPrompt } from "../features/notifications/components/push-permission-prompt";
+import { useAuth } from "../hooks/useAuth";
+import { usePushNotifications } from "../hooks/use-push-notifications";
 import AddCaregiverScreen from "../screens/add-caregiver-screen";
 import ProfileScreen from "../screens/profile-screen";
 import {
@@ -17,6 +20,15 @@ export function AuthenticatedRouter() {
   const [currentRouteKey, setCurrentRouteKey] =
     useState<AuthenticatedRouteKey>("inicio");
   const [overlayRoute, setOverlayRoute] = useState<AuthenticatedOverlayRoute>(null);
+  const { tipoUsuario } = useAuth();
+
+  // Tocar num lembrete leva ao Inicio, onde estao as doses e missoes do dia.
+  const { convitePendente, aceitarConvite, recusarConvite } = usePushNotifications({
+    onAbrirNotificacao: () => {
+      setOverlayRoute(null);
+      setCurrentRouteKey("inicio");
+    },
+  });
 
   const activeRoute = useMemo(
     () =>
@@ -100,6 +112,12 @@ export function AuthenticatedRouter() {
 
       {/* Fora da SafeAreaView para os modais cobrirem a tela inteira, inclusive a toolbar. */}
       <CelebrationHost />
+      <PushPermissionPrompt
+        visible={convitePendente}
+        isCaregiver={tipoUsuario === "CUIDADOR"}
+        onAccept={aceitarConvite}
+        onDecline={recusarConvite}
+      />
     </View>
   );
 }
