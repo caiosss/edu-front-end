@@ -66,17 +66,42 @@ export async function registrarAparelho(): Promise<string | null> {
     return null;
   }
 
-  const { data: token } = await Notifications.getDevicePushTokenAsync();
-  const resposta = await api.post<{ id: string }>("/notificacoes/dispositivos", {
-    token,
-    plataforma: "ANDROID",
-  });
+  // No primeiro login chegam juntos o registro inicial, o "permitir" do convite e o aviso de
+  // token novo do FCM. Sem esta trava saiam 5 POSTs no mesmo instante e o backend rejeitava 4
+  // (indice unico do token). Quem chega com um registro em andamento espera o mesmo resultado.
+  if (registroEmAndamento) {
+    return registroEmAndamento;
+  }
 
-  return resposta.data?.id ?? null;
+  registroEmAndamento = (async () => {
+    const { data: token } = await Notifications.getDevicePushTokenAsync();
+    // Mesmo token ja registrado nesta sessao: nada a mandar.
+    if (ultimoRegistro && ultimoRegistro.token === token) {
+      return ultimoRegistro.id;
+    }
+    const resposta = await api.post<{ id: string }>("/notificacoes/dispositivos", {
+      token,
+      plataforma: "ANDROID",
+    });
+    const id = resposta.data?.id ?? null;
+    ultimoRegistro = id ? { token, id } : null;
+    return id;
+  })();
+
+  try {
+    return await registroEmAndamento;
+  } finally {
+    registroEmAndamento = null;
+  }
 }
+
+let registroEmAndamento: Promise<string | null> | null = null;
+let ultimoRegistro: { token: string; id: string } | null = null;
 
 /** Para de enviar para este aparelho. Prazo curto: sair da conta nao pode travar sem internet. */
 export async function desregistrarAparelho(dispositivoId: string) {
+  // O proximo login registra de novo, mesmo que o token seja o mesmo.
+  ultimoRegistro = null;
   await api.delete(`/notificacoes/dispositivos/${dispositivoId}`, { timeout: 4000 });
 }
 
