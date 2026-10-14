@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppState, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, AppState, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import {
   Bell,
   CircleStar,
+  HeartHandshake,
   Flame,
   GlassWater,
   Pill,
@@ -11,11 +12,13 @@ import {
   Star,
   type LucideIcon,
 } from "lucide-react-native";
+import { AppText, BigButton, Card, StatusBanner } from "../components/ui";
 import { AnimatedXpBar } from "../features/gamification/components/animated-xp-bar";
 import { LevelRing } from "../features/gamification/components/level-ring";
 import type { ConclusaoResponse, ProgressoDoDia } from "../features/gamification/types";
 import { nivelRatio } from "../features/gamification/utils/level";
 import type {
+  DoseRegistrada,
   GeneralMissionResponse,
   MedicationMissionResponse,
 } from "../features/home/types";
@@ -33,6 +36,7 @@ import { useCompleteMission } from "../hooks/use-complete-mission";
 import { syncGamificationAfterReward, useGamification } from "../hooks/use-gamification";
 import { useHomeMissions } from "../hooks/use-home-missions";
 import { usePatientProfile } from "../hooks/use-patient-profile";
+import { useTodayDoses } from "../hooks/use-today-doses";
 import { useGamificationStore } from "../store/gamification-store";
 
 const DAILY_PROGRESS_GRADIENT = ["#63E6BE", "#20C997", "#2C7BE5"] as const;
@@ -106,14 +110,48 @@ const mapMedicationMissionToChecklistItem = (
   };
 };
 
+/** `LocalTime.toString()` do backend ("08:00", "08:00:30.123") cortado em horas e minutos. */
+const formatTime = (value: string | null): string | null => (value ? value.slice(0, 5) : null);
+
+/** Rotulo do item quando o cuidador so pode ver: sem `AGIR_PELO_PACIENTE`, nada e registrado. */
+const READ_ONLY_LABEL = "Só ver";
+
 export default function HomeScreen() {
   const { nome, tipoUsuario } = useAuth();
   const isCaregiver = tipoUsuario === "CUIDADOR";
-  // O nome do token basta; os perfis so sao buscados quando ele nao vem.
+  // O nome do token basta para o paciente. O cuidador sempre busca o perfil: e dele que sai o
+  // paciente sobre o qual age, que nao vai no token (SPEC-014 §5.7).
   const { patientProfile } = usePatientProfile({ enabled: !nome && !isCaregiver });
-  const { caregiverProfile } = useCaregiverProfile({ enabled: !nome && isCaregiver });
+  const {
+    caregiverProfile,
+    isLoading: isCaregiverProfileLoading,
+    errorMessage: caregiverProfileErrorMessage,
+    refreshCaregiverProfile,
+  } = useCaregiverProfile({ enabled: isCaregiver });
 
-  const { missions, isLoading, errorMessage, refreshHomeMissions } = useHomeMissions();
+  // O cuidador le o plano com VER_ADESAO e VER_MEDICACAO e registra com AGIR_PELO_PACIENTE.
+  const caregiverPatientId =
+    isCaregiver && caregiverProfile?.status === "ATIVO" ? caregiverProfile.pacienteId : null;
+  const caregiverScopes = caregiverProfile?.escopos ?? [];
+  const caregiverCanSee =
+    Boolean(caregiverPatientId) &&
+    caregiverScopes.includes("VER_ADESAO") &&
+    caregiverScopes.includes("VER_MEDICACAO");
+  const caregiverCanAct = caregiverCanSee && caregiverScopes.includes("AGIR_PELO_PACIENTE");
+  const isReadOnly = isCaregiver && !caregiverCanAct;
+  const patientFirstName = firstName(caregiverProfile?.pacienteNome);
+
+  const { missions, isLoading, errorMessage, refreshHomeMissions } = useHomeMissions({
+    enabled: !isCaregiver || caregiverCanSee,
+    pacienteId: caregiverPatientId,
+  });
+  const {
+    doses: todayDoses,
+    contestingIds,
+    errorMessage: contestErrorMessage,
+    refreshTodayDoses,
+    contest,
+  } = useTodayDoses({ enabled: !isCaregiver });
   const {
     completeMission,
     completingMissionKeys,
@@ -133,7 +171,10 @@ export default function HomeScreen() {
 
   const handleConclusao = useCallback(
     (conclusao: ConclusaoResponse) => {
-      applyConclusao(conclusao);
+      // O XP do registro do cuidador vai para o paciente; o cuidador nao acumula nada.
+      if (!isCaregiver) {
+        applyConclusao(conclusao);
+      }
 
       if (conclusao.registro?.progressoDoDia) {
         setDoseProgress(conclusao.registro.progressoDoDia);
@@ -141,9 +182,12 @@ export default function HomeScreen() {
 
       // O estado `concluido` e derivado no backend; a conquista destrava de forma assincrona.
       void refreshHomeMissions();
-      syncGamificationAfterReward();
+
+      if (!isCaregiver) {
+        syncGamificationAfterReward();
+      }
     },
-    [applyConclusao, refreshHomeMissions]
+    [applyConclusao, isCaregiver, refreshHomeMissions]
   );
 
   useEffect(() => {
@@ -162,13 +206,14 @@ export default function HomeScreen() {
       if (state === "active") {
         setCurrentDate(new Date());
         void refreshHomeMissions();
+        void refreshTodayDoses();
       }
     });
 
     return () => {
       subscription.remove();
     };
-  }, [refreshHomeMissions]);
+  }, [refreshHomeMissions, refreshTodayDoses]);
 
   const medicationScheduleById = useMemo(() => {
     const scheduleById = new Map<string, MedicationScheduleInfo>();
@@ -227,9 +272,15 @@ export default function HomeScreen() {
     () =>
       activeMedicationMissions.flatMap((mission) => {
         const scheduleInfo = medicationScheduleById.get(mission.id);
-        return scheduleInfo ? [mapMedicationMissionToChecklistItem(mission, scheduleInfo)] : [];
+
+        if (!scheduleInfo) {
+          return [];
+        }
+
+        const item = mapMedicationMissionToChecklistItem(mission, scheduleInfo);
+        return [isReadOnly ? { ...item, disabledLabel: READ_ONLY_LABEL } : item];
       }),
-    [activeMedicationMissions, medicationScheduleById]
+    [activeMedicationMissions, isReadOnly, medicationScheduleById]
   );
 
   const takenMedicationIds = useMemo(
@@ -255,8 +306,9 @@ export default function HomeScreen() {
 
     return missions.missoesGerais
       .filter((mission) => mission.ativa)
-      .map(mapGeneralMissionToChecklistItem);
-  }, [missions]);
+      .map(mapGeneralMissionToChecklistItem)
+      .map((item) => (isReadOnly ? { ...item, disabledLabel: READ_ONLY_LABEL } : item));
+  }, [isReadOnly, missions]);
 
   const completedDailyMissionItemIds = useMemo(() => {
     if (!missions) {
@@ -298,11 +350,30 @@ export default function HomeScreen() {
         .filter(
           (mission) =>
             !takenMedicationIds.includes(mission.id) &&
-            medicationScheduleById.get(mission.id)?.status === "upcoming"
+            (isReadOnly || medicationScheduleById.get(mission.id)?.status === "upcoming")
         )
         .map((mission) => mission.id),
-    [activeMedicationMissions, medicationScheduleById, takenMedicationIds]
+    [activeMedicationMissions, isReadOnly, medicationScheduleById, takenMedicationIds]
   );
+
+  const blockedDailyMissionItemIds = useMemo(
+    () => (isReadOnly ? dailyMissionItems.map((item) => item.id) : []),
+    [dailyMissionItems, isReadOnly]
+  );
+
+  /** Doses que o cuidador registrou hoje: o paciente pode contestar no mesmo dia (SPEC-014 §5.5). */
+  const caregiverDoses = useMemo(
+    () => todayDoses.filter((dose) => dose.registradoPor === "CUIDADOR"),
+    [todayDoses]
+  );
+
+  const medicationNameByItemId = useMemo(() => {
+    const names = new Map<string, string>();
+    missions?.missoesMedicamento.forEach((mission) => {
+      names.set(mission.id, mission.nomeMedicamento);
+    });
+    return names;
+  }, [missions]);
 
   const hasOverdueMedication = useMemo(
     () =>
@@ -333,6 +404,7 @@ export default function HomeScreen() {
 
   const toggleMedication = async (itemId: string) => {
     if (
+      isReadOnly ||
       takenMedicationIds.includes(itemId) ||
       completingMedicationItemIds.includes(itemId)
     ) {
@@ -348,6 +420,7 @@ export default function HomeScreen() {
     setCompletionErrorSection(null);
 
     const conclusao = await completeMission({
+      pacienteId: caregiverPatientId ?? undefined,
       prescricaoItemId: itemId,
     });
 
@@ -366,6 +439,7 @@ export default function HomeScreen() {
 
   const toggleMission = async (itemId: string) => {
     if (
+      isReadOnly ||
       completedMissionIds.includes(itemId) ||
       completingDailyMissionItemIds.includes(itemId)
     ) {
@@ -383,6 +457,7 @@ export default function HomeScreen() {
     setCompletionErrorSection(null);
 
     const conclusao = await completeMission({
+      pacienteId: caregiverPatientId ?? undefined,
       planoMissaoItemId: mission.id,
     });
 
@@ -395,6 +470,19 @@ export default function HomeScreen() {
     } else {
       setCompletionErrorSection("mission");
     }
+  };
+
+  const confirmContestDose = (dose: DoseRegistrada) => {
+    const medicationName = medicationNameByItemId.get(dose.prescricaoItemId) ?? "esta dose";
+
+    Alert.alert(
+      "Você não tomou esta dose?",
+      `A dose de ${medicationName} sai das doses tomadas de hoje. Ela não poderá ser registrada de novo.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Não tomei", style: "destructive", onPress: () => void contest(dose.id) },
+      ]
+    );
   };
 
   const dailyProgress = useMemo(() => {
@@ -416,6 +504,23 @@ export default function HomeScreen() {
 
   const name = firstName(nome ?? patientProfile?.nomeCompleto ?? caregiverProfile?.nomeCompleto);
   const greeting = name ? `${greetingFor(currentDate)}, ${name}!` : `${greetingFor(currentDate)}!`;
+  const heroSubtitle =
+    isCaregiver && patientFirstName
+      ? `Cuidados de hoje de ${patientFirstName}.`
+      : "Vamos começar os cuidados de hoje?";
+
+  /** Aviso do cuidador sem vinculo ativo ou sem permissao para ver o plano. */
+  const caregiverAccessMessage = useMemo(() => {
+    if (!isCaregiver || caregiverCanSee || !caregiverProfile) {
+      return "";
+    }
+
+    if (!caregiverProfile.pacienteId || caregiverProfile.status !== "ATIVO") {
+      return "Você ainda não acompanha nenhum paciente. Peça um convite à pessoa que você cuida.";
+    }
+
+    return `${patientFirstName ?? "O paciente"} ainda não liberou para você ver os remédios e as doses. Peça para liberar em "Meus cuidadores", no perfil.`;
+  }, [caregiverCanSee, caregiverProfile, isCaregiver, patientFirstName]);
 
   const medicationDescription = useMemo(() => {
     if (completionErrorSection === "medication" && completeMissionErrorMessage) {
@@ -434,13 +539,24 @@ export default function HomeScreen() {
       return "Confira os medicamentos em vermelho: o horário já passou.";
     }
 
+    if (isReadOnly) {
+      return `Você pode acompanhar as doses de ${patientFirstName ?? "quem você cuida"}, mas não registrar.`;
+    }
+
     if (blockedMedicationItemIds.length > 0) {
       return "Alguns medicamentos ainda não estão no horário.";
+    }
+
+    if (isCaregiver) {
+      return `Marque cada dose que ${patientFirstName ?? "a pessoa"} tomar, no horário certo.`;
     }
 
     return "Acompanhe e marque cada dose no horário certo.";
   }, [
     blockedMedicationItemIds.length,
+    isCaregiver,
+    isReadOnly,
+    patientFirstName,
     completeMissionErrorMessage,
     completionErrorSection,
     errorMessage,
@@ -462,8 +578,19 @@ export default function HomeScreen() {
       return "Carregando suas recomendações do dia...";
     }
 
+    if (isReadOnly) {
+      return "Você pode acompanhar as recomendações do dia, mas não registrar.";
+    }
+
+    if (isCaregiver) {
+      return `Marque as recomendações que ${patientFirstName ?? "a pessoa"} cumprir hoje.`;
+    }
+
     return "Complete suas recomendações para ganhar XP e evoluir de nível.";
   }, [
+    isCaregiver,
+    isReadOnly,
+    patientFirstName,
     completeMissionErrorMessage,
     completionErrorSection,
     errorMessage,
@@ -489,7 +616,7 @@ export default function HomeScreen() {
             <Bell size={22} color="#2C7BE5" />
           </View>
         </View>
-        <Text style={styles.subtitle}>Vamos começar os cuidados de hoje?</Text>
+        <Text style={styles.subtitle}>{heroSubtitle}</Text>
 
         {isPatient ? (
           <Animated.View entering={FadeIn.delay(160).duration(260)} style={styles.levelStrip}>
@@ -525,48 +652,124 @@ export default function HomeScreen() {
         ) : null}
       </Animated.View>
 
-      <Animated.View entering={FadeInDown.delay(60).duration(230)}>
-        <ChecklistCard
-          title="Medicamentos de hoje"
-          description={medicationDescription}
-          items={medicationItems}
-          checkedIds={takenMedicationIds}
-          loadingIds={completingMedicationItemIds}
-          disabledIds={blockedMedicationItemIds}
-          onToggleItem={toggleMedication}
+      {caregiverAccessMessage ? (
+        <StatusBanner tone="info" message={caregiverAccessMessage} />
+      ) : null}
+
+      {isCaregiver && caregiverProfileErrorMessage && !caregiverProfile ? (
+        <StatusBanner
+          tone="danger"
+          message={caregiverProfileErrorMessage}
+          action={{ label: "Tentar de novo", onPress: () => void refreshCaregiverProfile() }}
         />
-      </Animated.View>
+      ) : null}
 
-      <Animated.View entering={FadeInDown.delay(120).duration(240)}>
-        <ChecklistCard
-          title="Recomendações do dia"
-          description={missionDescription}
-          items={dailyMissionItems}
-          checkedIds={completedMissionIds}
-          loadingIds={completingDailyMissionItemIds}
-          onToggleItem={toggleMission}
-        />
-      </Animated.View>
+      {isCaregiver && isCaregiverProfileLoading && !caregiverProfile ? (
+        <Text style={styles.info}>Carregando os dados de quem você acompanha...</Text>
+      ) : null}
 
-      <Animated.View entering={FadeInDown.delay(180).duration(250)} style={styles.card}>
-        <View style={styles.progressHeader}>
-          <Text style={styles.h2}>Progresso de hoje</Text>
-          {dailyProgress.isComplete ? <Sparkles size={24} color="#F5B942" /> : null}
-        </View>
-        <Text style={styles.info}>
-          {dailyProgress.isComplete
-            ? "Tudo concluído por hoje. Excelente cuidado!"
-            : `Você concluiu ${dailyProgress.done} de ${dailyProgress.total} atividades hoje.`}
-        </Text>
+      {!isCaregiver || caregiverCanSee ? (
+        <>
+          <Animated.View entering={FadeInDown.delay(60).duration(230)}>
+            <ChecklistCard
+              title="Medicamentos de hoje"
+              description={medicationDescription}
+              items={medicationItems}
+              checkedIds={takenMedicationIds}
+              loadingIds={completingMedicationItemIds}
+              disabledIds={blockedMedicationItemIds}
+              onToggleItem={toggleMedication}
+            />
+          </Animated.View>
 
-        <AnimatedXpBar ratio={dailyProgress.ratio} colors={DAILY_PROGRESS_GRADIENT} height={14} />
+          <Animated.View entering={FadeInDown.delay(120).duration(240)}>
+            <ChecklistCard
+              title="Recomendações do dia"
+              description={missionDescription}
+              items={dailyMissionItems}
+              checkedIds={completedMissionIds}
+              loadingIds={completingDailyMissionItemIds}
+              disabledIds={blockedDailyMissionItemIds}
+              onToggleItem={toggleMission}
+            />
+          </Animated.View>
 
-        {doseProgress ? (
-          <Text style={styles.progressHint}>
-            Doses registradas hoje: {doseProgress.registradas} de {doseProgress.previstas}
-          </Text>
-        ) : null}
-      </Animated.View>
+          {caregiverDoses.length > 0 ? (
+            <Animated.View entering={FadeInDown.delay(150).duration(240)}>
+              <Card>
+                <View style={styles.caregiverDosesHeader}>
+                  <HeartHandshake size={24} color="#1155AA" />
+                  <AppText variant="heading" style={styles.caregiverDosesTitle}>
+                    Registradas pelo cuidador
+                  </AppText>
+                </View>
+                <AppText color="textSecondary">
+                  Se você não tomou alguma destas doses, avise hoje mesmo.
+                </AppText>
+
+                {contestErrorMessage ? (
+                  <StatusBanner tone="danger" message={contestErrorMessage} />
+                ) : null}
+
+                {caregiverDoses.map((dose) => {
+                  const registeredAt = formatTime(dose.horarioRegistrado);
+                  const scheduledAt = formatTime(dose.horarioPrevisto);
+                  const details = [
+                    scheduledAt ? `Dose das ${scheduledAt}` : null,
+                    registeredAt ? `marcada às ${registeredAt}` : null,
+                  ].filter(Boolean);
+
+                  return (
+                    <View key={dose.id} style={styles.caregiverDoseRow}>
+                      <AppText variant="bodyStrong">
+                        {medicationNameByItemId.get(dose.prescricaoItemId) ?? "Remédio"}
+                      </AppText>
+                      {details.length > 0 ? (
+                        <AppText variant="small" color="textSecondary">
+                          {details.join(", ")}
+                        </AppText>
+                      ) : null}
+                      {dose.contestada ? (
+                        <AppText variant="smallStrong" color="warning">
+                          Você avisou que não tomou. Ela não conta como tomada.
+                        </AppText>
+                      ) : (
+                        <BigButton
+                          label="Não tomei esta dose"
+                          variant="secondary"
+                          loading={contestingIds.includes(dose.id)}
+                          disabled={contestingIds.includes(dose.id)}
+                          onPress={() => confirmContestDose(dose)}
+                        />
+                      )}
+                    </View>
+                  );
+                })}
+              </Card>
+            </Animated.View>
+          ) : null}
+
+          <Animated.View entering={FadeInDown.delay(180).duration(250)} style={styles.card}>
+            <View style={styles.progressHeader}>
+              <Text style={styles.h2}>Progresso de hoje</Text>
+              {dailyProgress.isComplete ? <Sparkles size={24} color="#F5B942" /> : null}
+            </View>
+            <Text style={styles.info}>
+              {dailyProgress.isComplete
+                ? "Tudo concluído por hoje. Excelente cuidado!"
+                : `Você concluiu ${dailyProgress.done} de ${dailyProgress.total} atividades hoje.`}
+            </Text>
+
+            <AnimatedXpBar ratio={dailyProgress.ratio} colors={DAILY_PROGRESS_GRADIENT} height={14} />
+
+            {doseProgress ? (
+              <Text style={styles.progressHint}>
+                Doses registradas hoje: {doseProgress.registradas} de {doseProgress.previstas}
+              </Text>
+            ) : null}
+          </Animated.View>
+        </>
+      ) : null}
       </ScrollView>
     </View>
   );
@@ -707,5 +910,19 @@ const styles = StyleSheet.create({
     color: "#48627A",
     fontSize: 16,
     fontWeight: "600",
+  },
+  caregiverDosesHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  caregiverDosesTitle: {
+    flex: 1,
+  },
+  caregiverDoseRow: {
+    borderRadius: 12,
+    backgroundColor: "#F4F7FB",
+    padding: 12,
+    gap: 6,
   },
 });

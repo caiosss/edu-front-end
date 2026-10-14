@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { Controller, type Control, type FieldPath } from "react-hook-form";
+import { useScrollToFocusedInput } from "../../../components/ui";
 import type { RegistrationFormValues } from "../types";
 
 type FormInputProps = {
@@ -37,6 +38,7 @@ export function FormInput({
   valueFormatter,
 }: FormInputProps) {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const scrollToFocusedInput = useScrollToFocusedInput();
 
   return (
     <Controller
@@ -49,6 +51,7 @@ export function FormInput({
             <TextInput
               value={value}
               onBlur={onBlur}
+              onFocus={scrollToFocusedInput}
               onChangeText={(text) =>
                 onChange(valueFormatter ? valueFormatter(text) : text)
               }

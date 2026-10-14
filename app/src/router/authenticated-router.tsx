@@ -4,19 +4,33 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { CelebrationHost } from "../features/gamification/components/celebration-host";
 import { AuthToolbar } from "../features/navigation/components/auth-toolbar";
+import { PushPermissionPrompt } from "../features/notifications/components/push-permission-prompt";
+import { useAuth } from "../hooks/useAuth";
+import { layout } from "../theme";
+import { usePushNotifications } from "../hooks/use-push-notifications";
 import AddCaregiverScreen from "../screens/add-caregiver-screen";
+import CaregiversScreen from "../screens/caregivers-screen";
 import ProfileScreen from "../screens/profile-screen";
 import {
   authenticatedRoutes,
   type AuthenticatedRouteKey,
 } from "./authenticated-routes";
 
-type AuthenticatedOverlayRoute = "add-caregiver" | null;
+type AuthenticatedOverlayRoute = "caregivers" | "add-caregiver" | null;
 
 export function AuthenticatedRouter() {
   const [currentRouteKey, setCurrentRouteKey] =
     useState<AuthenticatedRouteKey>("inicio");
   const [overlayRoute, setOverlayRoute] = useState<AuthenticatedOverlayRoute>(null);
+  const { tipoUsuario } = useAuth();
+
+  // Tocar num lembrete leva ao Inicio, onde estao as doses e missoes do dia.
+  const { convitePendente, aceitarConvite, recusarConvite } = usePushNotifications({
+    onAbrirNotificacao: () => {
+      setOverlayRoute(null);
+      setCurrentRouteKey("inicio");
+    },
+  });
 
   const activeRoute = useMemo(
     () =>
@@ -35,7 +49,8 @@ export function AuthenticatedRouter() {
       const { currentRouteKey: routeKey, overlayRoute: overlay } = navigationStateRef.current;
 
       if (overlay !== null) {
-        setOverlayRoute(null);
+        // O convite e aberto a partir da lista de cuidadores: voltar leva a ela.
+        setOverlayRoute(overlay === "add-caregiver" ? "caregivers" : null);
         return true;
       }
 
@@ -61,15 +76,20 @@ export function AuthenticatedRouter() {
 
   const renderContent = () => {
     if (overlayRoute === "add-caregiver") {
-      return <AddCaregiverScreen onNavigateBack={() => setOverlayRoute(null)} />;
+      return <AddCaregiverScreen onNavigateBack={() => setOverlayRoute("caregivers")} />;
+    }
+
+    if (overlayRoute === "caregivers") {
+      return (
+        <CaregiversScreen
+          onNavigateBack={() => setOverlayRoute(null)}
+          onNavigateToInvite={() => setOverlayRoute("add-caregiver")}
+        />
+      );
     }
 
     if (activeRoute.key === "perfil") {
-      return (
-        <ProfileScreen
-          onNavigateToAddCaregiver={() => setOverlayRoute("add-caregiver")}
-        />
-      );
+      return <ProfileScreen onNavigateToCaregivers={() => setOverlayRoute("caregivers")} />;
     }
 
     return <ActiveScreen />;
@@ -78,28 +98,36 @@ export function AuthenticatedRouter() {
   return (
     <View style={styles.root}>
       <SafeAreaView style={styles.safeArea} edges={["top", "right", "left", "bottom"]}>
-        <View style={styles.contentArea}>
-          <Animated.View
-            key={contentKey}
-            entering={FadeIn.duration(190)}
-            exiting={FadeOut.duration(140)}
-            style={styles.screenContainer}
-          >
-            {renderContent()}
-          </Animated.View>
-        </View>
+        <View style={styles.contentColumn}>
+          <View style={styles.contentArea}>
+            <Animated.View
+              key={contentKey}
+              entering={FadeIn.duration(190)}
+              exiting={FadeOut.duration(140)}
+              style={styles.screenContainer}
+            >
+              {renderContent()}
+            </Animated.View>
+          </View>
 
-        {!isOverlayVisible ? (
-          <AuthToolbar
-            routes={authenticatedRoutes}
-            currentRouteKey={activeRoute.key}
-            onSelectRoute={setCurrentRouteKey}
-          />
-        ) : null}
+          {!isOverlayVisible ? (
+            <AuthToolbar
+              routes={authenticatedRoutes}
+              currentRouteKey={activeRoute.key}
+              onSelectRoute={setCurrentRouteKey}
+            />
+          ) : null}
+        </View>
       </SafeAreaView>
 
       {/* Fora da SafeAreaView para os modais cobrirem a tela inteira, inclusive a toolbar. */}
       <CelebrationHost />
+      <PushPermissionPrompt
+        visible={convitePendente}
+        isCaregiver={tipoUsuario === "CUIDADOR"}
+        onAccept={aceitarConvite}
+        onDecline={recusarConvite}
+      />
     </View>
   );
 }
@@ -112,6 +140,12 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "#EAF2FA",
+  },
+  contentColumn: {
+    flex: 1,
+    width: "100%",
+    maxWidth: layout.maxContentWidth,
+    alignSelf: "center",
   },
   contentArea: {
     flex: 1,

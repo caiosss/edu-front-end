@@ -1,5 +1,7 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
+import { desregistrarAparelho } from "../services/push-service";
 import { useAuthStore } from "../store/auth-store";
+import { usePushStore } from "../store/push-store";
 import { decodeTokenPayload, type JwtPayload } from "../utils/jwt";
 
 const asNonEmptyString = (value: unknown): string | null => {
@@ -37,6 +39,17 @@ export function useAuth() {
 
   const payload = useMemo(() => decodeTokenPayload(token), [token]);
 
+  // Sair desregistra o aparelho antes de apagar o token (o DELETE precisa dele): senao o
+  // celular continua recebendo os lembretes de quem saiu. Falha de rede nao impede sair.
+  const logout = useCallback(async () => {
+    const dispositivoId = usePushStore.getState().dispositivoId;
+    if (dispositivoId) {
+      await desregistrarAparelho(dispositivoId).catch(() => undefined);
+      usePushStore.getState().setDispositivoId(null);
+    }
+    clearToken();
+  }, [clearToken]);
+
   return {
     token,
     id,
@@ -52,5 +65,6 @@ export function useAuth() {
     payload,
     setToken,
     clearToken,
+    logout,
   };
 }

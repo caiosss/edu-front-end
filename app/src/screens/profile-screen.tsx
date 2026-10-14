@@ -48,7 +48,7 @@ type ProfileInfoRowProps = {
 };
 
 type ProfileScreenProps = {
-  onNavigateToAddCaregiver?: () => void;
+  onNavigateToCaregivers?: () => void;
 };
 
 function ProfileInfoRow({ label, value }: ProfileInfoRowProps) {
@@ -60,8 +60,8 @@ function ProfileInfoRow({ label, value }: ProfileInfoRowProps) {
   );
 }
 
-export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScreenProps) {
-  const { tipoUsuario, clearToken } = useAuth();
+export default function ProfileScreen({ onNavigateToCaregivers }: ProfileScreenProps) {
+  const { tipoUsuario, logout } = useAuth();
   const isCaregiverUser = tipoUsuario === "CUIDADOR";
 
   const {
@@ -94,7 +94,6 @@ export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScree
     : refreshPatientProfile;
 
   const caregiverNames = patientProfile?.nomeCuidadores ?? [];
-  const patientNames = caregiverProfile?.nomePacientes ?? [];
 
   const patientXpTotal = xpTotal ?? 0;
 
@@ -140,25 +139,28 @@ export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScree
             <Text style={styles.mainName}>{caregiverProfile.nomeCompleto}</Text>
 
             <View style={styles.metaGroup}>
-              <ProfileInfoRow label="Parentesco" value={caregiverProfile.relacao} />
-              <ProfileInfoRow label="Telefone" value={caregiverProfile.telefone} />
+              {caregiverProfile.relacao ? (
+                <ProfileInfoRow label="Parentesco" value={caregiverProfile.relacao} />
+              ) : null}
+              {caregiverProfile.telefone ? (
+                <ProfileInfoRow label="Telefone" value={caregiverProfile.telefone} />
+              ) : null}
+              {caregiverProfile.email ? (
+                <ProfileInfoRow label="E-mail" value={caregiverProfile.email} />
+              ) : null}
             </View>
           </Animated.View>
 
-          {patientNames.length > 0 ? (
+          {caregiverProfile.pacienteNome ? (
             <Animated.View entering={FadeInDown.delay(80).duration(230)} style={styles.card}>
               <View style={styles.cardHeader}>
                 <View style={styles.headerLeft}>
                   <Heart size={18} color="#2C7BE5" />
-                  <Text style={styles.cardTitle}>Pacientes</Text>
+                  <Text style={styles.cardTitle}>Paciente que você acompanha</Text>
                 </View>
               </View>
-              <View style={styles.caregiverNamesList}>
-                {patientNames.map((nome, index) => (
-                  <View key={`${nome}-${index}`} style={styles.infoRow}>
-                    <Text style={styles.infoValue}>{nome}</Text>
-                  </View>
-                ))}
+              <View style={styles.infoRow}>
+                <Text style={styles.infoValue}>{caregiverProfile.pacienteNome}</Text>
               </View>
             </Animated.View>
           ) : null}
@@ -250,13 +252,13 @@ export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScree
         </>
       ) : null}
 
-      {!isCaregiverUser && onNavigateToAddCaregiver ? (
+      {!isCaregiverUser && onNavigateToCaregivers ? (
         <Pressable
-          onPress={onNavigateToAddCaregiver}
+          onPress={onNavigateToCaregivers}
           style={styles.addCaregiverButton}
           android_ripple={{ color: "rgba(255, 255, 255, 0.22)", borderless: false }}
         >
-          <Text style={styles.addCaregiverButtonText}>Adicionar cuidador</Text>
+          <Text style={styles.addCaregiverButtonText}>Meus cuidadores</Text>
         </Pressable>
       ) : null}
 
@@ -288,7 +290,7 @@ export default function ProfileScreen({ onNavigateToAddCaregiver }: ProfileScree
       </Animated.View>
 
       <Pressable
-        onPress={clearToken}
+        onPress={logout}
         style={styles.logoutButton}
         android_ripple={{ color: "rgba(255, 255, 255, 0.22)", borderless: false }}
       >

@@ -83,7 +83,7 @@ export function useCompleteMission(): UseCompleteMissionResult {
 
       try {
         const conclusao = await completeMissionRequest(
-          { planoMissaoItemId, prescricaoItemId },
+          { pacienteId: input.pacienteId, planoMissaoItemId, prescricaoItemId },
           resolveIdempotencyKey(missionKey)
         );
         idempotencyKeysRef.current.delete(missionKey);
