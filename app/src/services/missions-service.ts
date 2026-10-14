@@ -7,7 +7,9 @@ import type {
   Registro,
 } from "../features/gamification/types";
 import type {
+  AutorRegistro,
   CompleteMissionPayload,
+  DoseRegistrada,
   GeneralMissionResponse,
   MedicationMissionResponse,
   MyMissionsResponse,
@@ -267,6 +269,47 @@ export const fetchMyMissions = async (): Promise<MyMissionsResponse> => {
   }
 };
 
+/**
+ * O "minhas" de um paciente, para o cuidador que age por ele (SPEC-014 §5.4). O cuidador
+ * precisa de `VER_ADESAO` e `VER_MEDICACAO`; sem eles o mission-service responde 403.
+ */
+export const fetchPatientMissions = async (pacienteId: string): Promise<MyMissionsResponse> => {
+  try {
+    const response = await api.get(`/missoes/pacientes/${pacienteId}`);
+    return normalizeMyMissionsResponse(response.data);
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+
+      if (status === 401) {
+        throw new FriendlyError(ERROR_MESSAGES.session);
+      }
+
+      if (status === 403) {
+        throw new FriendlyError(
+          "Você ainda não tem permissão para ver os remédios e as doses desta pessoa."
+        );
+      }
+
+      if (status === 404) {
+        throw new FriendlyError("Ainda não há medicamentos nem missões cadastrados.");
+      }
+
+      if (status && status >= 500) {
+        throw new FriendlyError(ERROR_MESSAGES.server);
+      }
+
+      if (!status) {
+        throw new FriendlyError(ERROR_MESSAGES.network);
+      }
+
+      throw new FriendlyError("Não foi possível carregar os medicamentos e missões agora. Tente de novo.");
+    }
+
+    throw error;
+  }
+};
+
 export class CompleteMissionNetworkError extends FriendlyError {
   constructor() {
     super(ERROR_MESSAGES.network);
@@ -291,8 +334,11 @@ export const completeMission = async (
     throw new Error("ID do item do plano ou da prescrição ausente.");
   }
 
+  // O cuidador informa o paciente; o paciente usa o proprio, do token.
+  const pacienteIdInformado = payload.pacienteId?.trim() || null;
+
   try {
-    const pacienteId = await resolveCurrentPatientId();
+    const pacienteId = pacienteIdInformado ?? (await resolveCurrentPatientId());
     const response = await api.post(
       "/missoes/concluir",
       { pacienteId, planoMissaoItemId, prescricaoItemId },
@@ -310,6 +356,10 @@ export const completeMission = async (
 
       if (status === 409) {
         throw new FriendlyError(backendMessage ?? "Este registro já foi feito.");
+      }
+
+      if (status === 403 && pacienteIdInformado) {
+        throw new FriendlyError("Você não tem permissão para registrar por esta pessoa.");
       }
 
       if (status === 401 || status === 403) {
@@ -334,5 +384,88 @@ export const completeMission = async (
     }
 
     throw error;
+  }
+};
+
+const AUTORES_REGISTRO: AutorRegistro[] = ["PACIENTE", "CUIDADOR", "MEDICO", "ADMIN"];
+
+/** `DoseRegistradaDTO`. `registradoPor` nulo e linha antiga, sempre do proprio paciente. */
+const normalizeDoseRegistrada = (data: unknown): DoseRegistrada => {
+  const dose = asObject(data);
+  const id = asNonEmptyString(dose?.id);
+  const prescricaoItemId = asNonEmptyString(dose?.prescricaoItemId);
+
+  if (!dose || !id || !prescricaoItemId) {
+    throw new Error("Resposta de doses registradas inválida.");
+  }
+
+  return {
+    id,
+    prescricaoItemId,
+    horarioPrevisto: asNonEmptyString(dose.horarioPrevisto),
+    horarioRegistrado: asNonEmptyString(dose.horarioRegistrado),
+    registradoPor:
+      AUTORES_REGISTRO.find((autor) => autor === dose.registradoPor) ?? "PACIENTE",
+    contestada: asBoolean(dose.contestada) ?? false,
+  };
+};
+
+const toDoseFriendlyError = (error: unknown, fallback: string): unknown => {
+  if (!axios.isAxiosError(error)) {
+    return error;
+  }
+
+  const status = error.response?.status;
+  const backendMessage = extractApiErrorMessage(error.response?.data);
+
+  if (!status) {
+    return new FriendlyError(ERROR_MESSAGES.network);
+  }
+
+  if (status === 401) {
+    return new FriendlyError(ERROR_MESSAGES.session);
+  }
+
+  // 409: dose do proprio paciente ou de outro dia. O texto do backend explica o motivo.
+  if (status === 409) {
+    return new FriendlyError(backendMessage ?? "Esta dose não pode mais ser corrigida.");
+  }
+
+  if (status === 403) {
+    return new FriendlyError("Só você pode corrigir as suas doses.");
+  }
+
+  if (status >= 500) {
+    return new FriendlyError(ERROR_MESSAGES.server);
+  }
+
+  return new FriendlyError(fallback);
+};
+
+/** As doses registradas hoje, com quem registrou (SPEC-014 §5.5). So o proprio paciente. */
+export const fetchTodayDoses = async (): Promise<DoseRegistrada[]> => {
+  try {
+    const response = await api.get("/missoes/doses/hoje");
+
+    if (!Array.isArray(response.data)) {
+      throw new Error("Resposta de doses registradas inválida.");
+    }
+
+    return response.data.map(normalizeDoseRegistrada);
+  } catch (error) {
+    throw toDoseFriendlyError(error, "Não foi possível carregar as doses de hoje. Tente de novo.");
+  }
+};
+
+/**
+ * "Nao fui eu que tomei": a dose registrada pelo cuidador sai da adesao, mas o XP fica e o
+ * horario continua ocupado. So no mesmo dia; contestar de novo devolve o mesmo estado.
+ */
+export const contestDose = async (historicoId: string): Promise<DoseRegistrada> => {
+  try {
+    const response = await api.post(`/missoes/doses/${historicoId}/contestar`);
+    return normalizeDoseRegistrada(response.data);
+  } catch (error) {
+    throw toDoseFriendlyError(error, "Não foi possível corrigir esta dose agora. Tente de novo.");
   }
 };

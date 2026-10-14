@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import type { MyMissionsResponse } from "../features/home/types";
-import { fetchMyMissions } from "../services/missions-service";
+import { fetchMyMissions, fetchPatientMissions } from "../services/missions-service";
 import { useAuthStore } from "../store/auth-store";
 import { ERROR_MESSAGES, toFriendlyMessage } from "../utils/friendly-error";
 
 type UseHomeMissionsOptions = {
   enabled?: boolean;
+  /** Paciente sobre o qual o cuidador age. Sem ele, as missoes sao as do proprio paciente. */
+  pacienteId?: string | null;
 };
 
 type UseHomeMissionsResult = {
@@ -18,7 +20,7 @@ type UseHomeMissionsResult = {
 export function useHomeMissions(
   options: UseHomeMissionsOptions = {}
 ): UseHomeMissionsResult {
-  const { enabled = true } = options;
+  const { enabled = true, pacienteId = null } = options;
   const token = useAuthStore((state) => state.token);
 
   const [missions, setMissions] = useState<MyMissionsResponse | null>(null);
@@ -43,7 +45,9 @@ export function useHomeMissions(
     setErrorMessage("");
 
     try {
-      const myMissions = await fetchMyMissions();
+      const myMissions = pacienteId
+        ? await fetchPatientMissions(pacienteId)
+        : await fetchMyMissions();
       setMissions(myMissions);
     } catch (error) {
       setMissions(null);
@@ -53,7 +57,7 @@ export function useHomeMissions(
     } finally {
       setIsLoading(false);
     }
-  }, [enabled, token]);
+  }, [enabled, pacienteId, token]);
 
   useEffect(() => {
     void refreshHomeMissions();

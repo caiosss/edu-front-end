@@ -22,9 +22,14 @@ import { loginSchema } from "../features/login/validation";
 
 type LoginScreenProps = {
   onNavigateToRegister?: () => void;
+  /** Cuidador convidado pelo paciente: cria a senha com o link do e-mail (SPEC-014 §5.2). */
+  onNavigateToActivateInvite?: () => void;
 };
 
-export default function LoginScreen({ onNavigateToRegister }: LoginScreenProps) {
+export default function LoginScreen({
+  onNavigateToRegister,
+  onNavigateToActivateInvite,
+}: LoginScreenProps) {
   const { width } = useWindowDimensions();
   const containerWidth = useMemo(() => Math.min(width - 24, 540), [width]);
   const { feedbackMessage, feedbackState, clearFeedback, submitLogin } =
@@ -129,6 +134,19 @@ export default function LoginScreen({ onNavigateToRegister }: LoginScreenProps) 
                   disabled={isSubmitting}
                 >
                   <Text style={styles.switchAuthText}>Criar conta</Text>
+                </Pressable>
+              ) : null}
+
+              {onNavigateToActivateInvite ? (
+                <Pressable
+                  onPress={() => {
+                    clearFeedback();
+                    onNavigateToActivateInvite();
+                  }}
+                  style={styles.switchAuthAction}
+                  disabled={isSubmitting}
+                >
+                  <Text style={styles.switchAuthText}>Sou cuidador e recebi um convite</Text>
                 </Pressable>
               ) : null}
             </View>

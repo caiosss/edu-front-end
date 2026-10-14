@@ -1,410 +1,185 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from "react-native";
-import { ChevronLeft } from "lucide-react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
+import { Send } from "lucide-react-native";
 import { useForm } from "react-hook-form";
-import { CaregiverFormFields } from "../features/register/components/caregiver-form-fields";
-import { FormInput } from "../features/register/components/form-input";
-import { buildRegisterPayload } from "../features/register/payload";
-import { useRegistrationStore } from "../features/register/store/use-registration-store";
-import type { RegistrationFormValues, UserType } from "../features/register/types";
-import { registerCaregiverAndCreateLink } from "../services/registration-service";
+import {
+  AppText,
+  BigButton,
+  Card,
+  ScreenHeader,
+  StatusBanner,
+  TextField,
+} from "../components/ui";
+import {
+  caregiverInviteDefaultValues,
+  type CaregiverInviteFormValues,
+  type CaregiverInviteResult,
+} from "../features/caregivers/types";
+import { caregiverInviteSchema } from "../features/caregivers/validation";
+import { inviteCaregiver, resendCaregiverInvite } from "../services/caregiver-service";
+import { colors, spacing } from "../theme";
 import { toFriendlyMessage } from "../utils/friendly-error";
-
-type FeedbackState = "idle" | "success" | "error";
-
-const caregiverFormFields: Array<keyof RegistrationFormValues> = [
-  "email",
-  "senha",
-  "pacienteCpf",
-  "pacienteNomeCompleto",
-  "cuidadorNomeCompleto",
-  "cuidadorTelefone",
-  "cuidadorRelacao",
-];
-
-const isValidEmail = (value: string): boolean => {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
-};
 
 type AddCaregiverScreenProps = {
   onNavigateBack: () => void;
 };
 
+/**
+ * O paciente convida um cuidador por e-mail (SPEC-014 §5.2). O cuidador cria a propria senha
+ * pelo link; o convite vale 72 horas e entra como "Convite enviado" na lista de cuidadores.
+ */
 export default function AddCaregiverScreen({ onNavigateBack }: AddCaregiverScreenProps) {
-  const { width } = useWindowDimensions();
-  const draft = useRegistrationStore((state) => state.draft);
-  const updateDraft = useRegistrationStore((state) => state.updateDraft);
-  const [isCaregiverLookupLoading, setIsCaregiverLookupLoading] = useState(false);
-  const [feedbackState, setFeedbackState] = useState<FeedbackState>("idle");
-  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [invite, setInvite] = useState<CaregiverInviteResult | null>(null);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isResending, setIsResending] = useState(false);
 
   const {
     control,
-    setValue,
-    watch,
     handleSubmit,
-    setError,
-    clearErrors,
+    reset,
     formState: { isSubmitting },
-  } =
-    useForm<RegistrationFormValues>({
-      defaultValues: draft,
-      mode: "onChange",
-      reValidateMode: "onChange",
-    });
+  } = useForm<CaregiverInviteFormValues>({
+    resolver: zodResolver(caregiverInviteSchema),
+    defaultValues: caregiverInviteDefaultValues,
+    mode: "onSubmit",
+    reValidateMode: "onChange",
+  });
 
-  const containerWidth = useMemo(() => Math.min(width - 24, 540), [width]);
+  const submitInvite = handleSubmit(async (values) => {
+    setErrorMessage("");
+    setInvite(null);
 
-  useEffect(() => {
-    const subscription = watch((values) => {
-      updateDraft(values as Partial<RegistrationFormValues>);
-    });
-
-    return () => subscription.unsubscribe();
-  }, [watch, updateDraft]);
-
-  useEffect(() => {
-    setValue("tipoUsuario", "CUIDADOR", {
-      shouldDirty: false,
-      shouldValidate: false,
-    });
-    setValue("senha", "", {
-      shouldDirty: false,
-      shouldValidate: false,
-    });
-  }, [setValue]);
-
-  const validateCaregiverForm = (values: RegistrationFormValues): boolean => {
-    let isValid = true;
-
-    clearErrors(caregiverFormFields);
-
-    const cpfDigits = values.pacienteCpf.replace(/\D/g, "");
-    if (!values.email.trim()) {
-      setError("email", {
-        type: "manual",
-        message: "Preencha este campo.",
-      });
-      isValid = false;
-    } else if (!isValidEmail(values.email)) {
-      setError("email", {
-        type: "manual",
-        message: "Informe um e-mail válido.",
-      });
-      isValid = false;
+    try {
+      setInvite(await inviteCaregiver(values));
+      reset(caregiverInviteDefaultValues);
+    } catch (error) {
+      setErrorMessage(
+        toFriendlyMessage(error, "Não foi possível enviar o convite agora. Tente de novo.")
+      );
     }
+  });
 
-    if (values.senha.length < 8) {
-      setError("senha", {
-        type: "manual",
-        message: "A senha precisa ter pelo menos 8 caracteres.",
-      });
-      isValid = false;
-    } else if (
-      !/[A-Z]/.test(values.senha) ||
-      !/[a-z]/.test(values.senha) ||
-      !/[0-9]/.test(values.senha)
-    ) {
-      setError("senha", {
-        type: "manual",
-        message: "Use letras maiúsculas, minúsculas e pelo menos 1 número.",
-      });
-      isValid = false;
-    }
-
-    if (cpfDigits.length !== 11) {
-      setError("pacienteCpf", {
-        type: "manual",
-        message: "Informe um CPF válido, com 11 dígitos.",
-      });
-      isValid = false;
-    }
-
-    if (!values.pacienteNomeCompleto.trim()) {
-      setError("pacienteNomeCompleto", {
-        type: "manual",
-        message: "Preencha este campo.",
-      });
-      isValid = false;
-    }
-
-    if (!values.cuidadorNomeCompleto.trim()) {
-      setError("cuidadorNomeCompleto", {
-        type: "manual",
-        message: "Preencha este campo.",
-      });
-      isValid = false;
-    }
-
-    if (!values.cuidadorRelacao.trim()) {
-      setError("cuidadorRelacao", {
-        type: "manual",
-        message: "Preencha este campo.",
-      });
-      isValid = false;
-    }
-
-    const phoneDigits = values.cuidadorTelefone.replace(/\D/g, "");
-    if (!values.cuidadorTelefone.trim()) {
-      setError("cuidadorTelefone", {
-        type: "manual",
-        message: "Preencha este campo.",
-      });
-      isValid = false;
-    } else if (phoneDigits.length < 10 || phoneDigits.length > 11) {
-      setError("cuidadorTelefone", {
-        type: "manual",
-        message: "Informe um telefone válido, com DDD.",
-      });
-      isValid = false;
-    }
-
-    return isValid;
-  };
-
-  const submitCaregiver = async (values: RegistrationFormValues) => {
-    setFeedbackState("idle");
-    setFeedbackMessage("");
-
-    if (!validateCaregiverForm(values)) {
+  const resendInvite = async () => {
+    if (!invite) {
       return;
     }
 
-    const userType: UserType = "CUIDADOR";
-    const payload = buildRegisterPayload(
-      {
-        ...values,
-        tipoUsuario: userType,
-        pacienteCpf: values.pacienteCpf.replace(/\D/g, ""),
-      },
-      userType
-    );
+    setIsResending(true);
+    setErrorMessage("");
 
     try {
-      await registerCaregiverAndCreateLink(payload);
-
-      setFeedbackState("success");
-      setFeedbackMessage(
-        "Cuidador cadastrado. Agora envie a senha temporária para essa pessoa."
-      );
-
-      setValue("email", "", { shouldDirty: false, shouldValidate: false });
-      setValue("senha", "", { shouldDirty: false, shouldValidate: false });
-      setValue("cuidadorNomeCompleto", "", { shouldDirty: false, shouldValidate: false });
-      setValue("cuidadorTelefone", "", { shouldDirty: false, shouldValidate: false });
-      setValue("cuidadorRelacao", "", { shouldDirty: false, shouldValidate: false });
-      setValue("pacienteCpf", "", { shouldDirty: false, shouldValidate: false });
+      setInvite(await resendCaregiverInvite(invite.vinculo.id));
     } catch (error) {
-      setFeedbackState("error");
-      setFeedbackMessage(
-        toFriendlyMessage(error, "Não foi possível cadastrar o cuidador agora. Tente de novo.")
+      setErrorMessage(
+        toFriendlyMessage(error, "Não foi possível reenviar o convite agora. Tente de novo.")
       );
+    } finally {
+      setIsResending(false);
     }
   };
 
+  const invitedName = invite?.vinculo.nomeCompleto ?? "";
+  const invitedEmail = invite?.vinculo.email ?? "o e-mail informado";
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={styles.keyboardView}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      style={styles.keyboardView}
+    >
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContainer}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Animated.View
-            entering={FadeInDown.duration(260)}
-            style={[styles.card, { width: containerWidth }]}
-          >
-            <View style={styles.headerRow}>
-              <Pressable
-                onPress={onNavigateBack}
-                style={styles.chevronAction}
-                disabled={isSubmitting}
-              >
-                <ChevronLeft size={20} color="#35506B" />
-              </Pressable>
-              <Text style={styles.pageTitle}>Adicionar cuidador</Text>
-              <View style={styles.chevronSpacer} />
-            </View>
+        <ScreenHeader
+          title="Convidar cuidador"
+          subtitle="A pessoa recebe um link no e-mail e cria a própria senha. Você escolhe depois o que ela pode ver e fazer."
+          onBack={onNavigateBack}
+        />
 
-            <Text style={styles.pageDescription}>
-              Preencha os dados para vincular um cuidador ao paciente.
-            </Text>
+        {invite?.envio === "ENVIADO" ? (
+          <StatusBanner
+            tone="success"
+            title="Convite enviado"
+            message={`Mandamos o link para ${invitedEmail}. Ele vale por 72 horas. Peça para ${invitedName} abrir o e-mail no celular.`}
+          />
+        ) : null}
 
-            <FormInput
+        {invite?.envio === "FALHOU" ? (
+          <StatusBanner
+            tone="warning"
+            title="O e-mail não saiu"
+            message={`O convite de ${invitedName} foi criado, mas não conseguimos enviar o e-mail. Tente reenviar.`}
+            action={{
+              label: isResending ? "Reenviando..." : "Reenviar convite",
+              onPress: () => void resendInvite(),
+            }}
+          />
+        ) : null}
+
+        <Animated.View entering={FadeInDown.duration(240)}>
+          <Card>
+            <TextField
+              control={control}
+              name="nomeCompleto"
+              label="Nome do cuidador"
+              placeholder="Ex.: Ana Souza"
+              autoCapitalize="words"
+            />
+            <TextField
               control={control}
               name="email"
               label="E-mail do cuidador"
+              hint="O convite chega neste e-mail."
               placeholder="cuidador@email.com"
               keyboardType="email-address"
               autoCapitalize="none"
+              autoComplete="email"
             />
-
-            <FormInput
+            <TextField
               control={control}
-              name="senha"
-              label="Senha temporária do cuidador"
-              placeholder="Mínimo de 8 caracteres"
-              isPassword
-              autoCapitalize="none"
+              name="telefone"
+              label="Telefone (opcional)"
+              placeholder="(00) 00000-0000"
+              keyboardType="phone-pad"
             />
-
-            <CaregiverFormFields
+            <TextField
               control={control}
-              watch={watch}
-              setValue={setValue}
-              isSubmitting={isSubmitting}
-              onLookupLoadingChange={setIsCaregiverLookupLoading}
+              name="relacao"
+              label="Quem é essa pessoa? (opcional)"
+              placeholder="Ex.: filha, enfermeira, vizinho"
             />
 
-            {feedbackState !== "idle" ? (
-              <View
-                style={[
-                  styles.feedbackBox,
-                  feedbackState === "success"
-                    ? styles.feedbackSuccess
-                    : styles.feedbackError,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.feedbackText,
-                    feedbackState === "success"
-                      ? styles.feedbackTextSuccess
-                      : styles.feedbackTextError,
-                  ]}
-                >
-                  {feedbackMessage}
-                </Text>
-              </View>
-            ) : null}
+            {errorMessage ? <StatusBanner tone="danger" message={errorMessage} /> : null}
 
-            <Pressable
-              onPress={() => void handleSubmit(submitCaregiver)()}
-              style={[styles.saveButton, isSubmitting ? styles.saveButtonLoading : undefined]}
-              disabled={isSubmitting || isCaregiverLookupLoading}
-            >
-              <Text style={styles.saveButtonText}>
-                {isSubmitting ? "Salvando..." : "Salvar cuidador"}
-              </Text>
-            </Pressable>
-          </Animated.View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+            <BigButton
+              label={isSubmitting ? "Enviando..." : "Enviar convite"}
+              icon={Send}
+              loading={isSubmitting}
+              disabled={isSubmitting || isResending}
+              onPress={() => void submitInvite()}
+            />
+          </Card>
+        </Animated.View>
+
+        <AppText variant="small" color="textSecondary">
+          Você pode ter até 3 cuidadores. Cada cuidador acompanha só você.
+        </AppText>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#EAF2FA",
-  },
   keyboardView: {
     flex: 1,
+    backgroundColor: colors.background,
   },
-  scrollContainer: {
-    flexGrow: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 22,
-  },
-  card: {
-    borderRadius: 24,
-    backgroundColor: "#FDFEFF",
-    borderWidth: 1,
-    borderColor: "#D5DEE8",
-    paddingHorizontal: 18,
-    paddingVertical: 22,
-    gap: 18,
-    shadowColor: "#1A2B3A",
-    shadowOpacity: 0.08,
-    shadowOffset: { width: 0, height: 8 },
-    shadowRadius: 16,
-    elevation: 4,
-  },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  chevronAction: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    borderWidth: 1,
-    borderColor: "#B7C6D7",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#F9FBFE",
-  },
-  chevronSpacer: {
-    width: 34,
-    height: 34,
-  },
-  pageTitle: {
-    color: "#12314C",
-    fontSize: 23,
-    fontWeight: "700",
-    flex: 1,
-    textAlign: "center",
-  },
-  pageDescription: {
-    color: "#48627A",
-    fontSize: 17,
-    lineHeight: 24,
-  },
-  feedbackBox: {
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 12,
-  },
-  feedbackSuccess: {
-    backgroundColor: "#EAF8EF",
-    borderColor: "#A8D9B8",
-  },
-  feedbackError: {
-    backgroundColor: "#FDEDED",
-    borderColor: "#F1B4B4",
-  },
-  feedbackText: {
-    fontWeight: "600",
-    fontSize: 16,
-  },
-  feedbackTextSuccess: {
-    color: "#1F6B38",
-  },
-  feedbackTextError: {
-    color: "#9B2F2F",
-  },
-  saveButton: {
-    minHeight: 56,
-    borderRadius: 12,
-    backgroundColor: "#2C7BE5",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 14,
-  },
-  saveButtonLoading: {
-    opacity: 0.9,
-  },
-  saveButtonText: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "700",
+  scrollContent: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xxl,
+    gap: spacing.lg,
   },
 });

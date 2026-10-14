@@ -1,39 +1,13 @@
 import axios from "axios";
 import type { LoginPayload, LoginResult } from "../features/login/types";
 import { useAuthStore } from "../store/auth-store";
-import { api } from "./api";
+import { api, extractApiErrorMessage } from "./api";
 import { ERROR_MESSAGES, FriendlyError } from "../utils/friendly-error";
 
 const invalidCredentialsCode = "INVALID_CREDENTIALS";
 
 const asNonEmptyString = (value: unknown): string | null => {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
-};
-
-const normalizeCpf = (cpf: string): string => cpf.replace(/\D/g, "");
-
-const extractPatientName = (data: unknown): string | null => {
-  if (typeof data === "string") {
-    return asNonEmptyString(data);
-  }
-
-  if (!data || typeof data !== "object") {
-    return null;
-  }
-
-  const parsedData = data as {
-    nome?: unknown;
-    nomeCompleto?: unknown;
-    fullName?: unknown;
-    patientName?: unknown;
-  };
-
-  return (
-    asNonEmptyString(parsedData.nome) ??
-    asNonEmptyString(parsedData.nomeCompleto) ??
-    asNonEmptyString(parsedData.fullName) ??
-    asNonEmptyString(parsedData.patientName)
-  );
 };
 
 const normalizeLoginResponse = (data: unknown): LoginResult => {
@@ -116,39 +90,39 @@ export const loginUser = async (payload: LoginPayload): Promise<LoginResult> => 
   }
 };
 
-export const fetchPatientNameByCpf = async (cpf: string): Promise<string> => {
-  const normalizedCpf = normalizeCpf(cpf);
-
-  if (normalizedCpf.length !== 11) {
-    throw new FriendlyError("Informe um CPF válido, com 11 dígitos.");
-  }
-
+/**
+ * O cuidador cria a senha com o token do e-mail e ja entra (SPEC-014 §5.2). Token invalido,
+ * usado ou vencido volta 400 com uma mensagem unica, que nao diz qual dos casos foi.
+ */
+export const activateCaregiverInvite = async (
+  token: string,
+  senha: string
+): Promise<LoginResult> => {
   try {
-    const response = await api.get(`/auth/${normalizedCpf}`);
-    const patientName = extractPatientName(response.data);
-
-    if (!patientName) {
-      throw new Error("Resposta inválida da API ao consultar CPF.");
-    }
-
-    return patientName;
+    const response = await api.post("/auth/convites/ativar", { token: token.trim(), senha });
+    const session = normalizeLoginResponse(response.data);
+    useAuthStore.getState().setSession(session);
+    return session;
   } catch (error) {
     if (axios.isAxiosError(error)) {
       const status = error.response?.status;
-
-      if (status === 404) {
-        throw new FriendlyError("Não encontramos nenhum paciente com esse CPF. Confira os números.");
-      }
+      const backendMessage = extractApiErrorMessage(error.response?.data);
 
       if (status === 400) {
-        throw new FriendlyError("Esse CPF não é válido. Confira os números.");
+        throw new FriendlyError(
+          backendMessage ?? "Convite inválido ou vencido. Peça ao paciente um novo convite."
+        );
+      }
+
+      if (status && status >= 500) {
+        throw new FriendlyError(ERROR_MESSAGES.server);
       }
 
       if (!status) {
         throw new FriendlyError(ERROR_MESSAGES.network);
       }
 
-      throw new FriendlyError("Não foi possível buscar o paciente agora. Tente de novo.");
+      throw new FriendlyError("Não foi possível ativar o convite agora. Tente de novo.");
     }
 
     throw error;

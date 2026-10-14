@@ -83,8 +83,25 @@ export type MyMissionsResponse = {
   missoesMedicamento: MedicationMissionResponse[];
 };
 
-/** Corpo de `POST /missoes/concluir`, sem o `pacienteId` (resolvido pelo service). */
+/**
+ * Corpo de `POST /missoes/concluir`. Sem `pacienteId`, o service usa o paciente da sessao; o
+ * cuidador informa o paciente sobre o qual age (SPEC-014 §5.4).
+ */
 export type CompleteMissionPayload = {
+  pacienteId?: string;
   planoMissaoItemId?: string;
   prescricaoItemId?: string;
+};
+
+/** `AutorRegistro`: quem fez o registro. Vem do token, nunca do corpo. */
+export type AutorRegistro = "PACIENTE" | "CUIDADOR" | "MEDICO" | "ADMIN";
+
+/** `DoseRegistradaDTO`: uma dose registrada hoje, de onde o paciente contesta (SPEC-014 §5.5). */
+export type DoseRegistrada = {
+  id: string;
+  prescricaoItemId: string;
+  horarioPrevisto: string | null;
+  horarioRegistrado: string | null;
+  registradoPor: AutorRegistro;
+  contestada: boolean;
 };

@@ -8,13 +8,14 @@ import { PushPermissionPrompt } from "../features/notifications/components/push-
 import { useAuth } from "../hooks/useAuth";
 import { usePushNotifications } from "../hooks/use-push-notifications";
 import AddCaregiverScreen from "../screens/add-caregiver-screen";
+import CaregiversScreen from "../screens/caregivers-screen";
 import ProfileScreen from "../screens/profile-screen";
 import {
   authenticatedRoutes,
   type AuthenticatedRouteKey,
 } from "./authenticated-routes";
 
-type AuthenticatedOverlayRoute = "add-caregiver" | null;
+type AuthenticatedOverlayRoute = "caregivers" | "add-caregiver" | null;
 
 export function AuthenticatedRouter() {
   const [currentRouteKey, setCurrentRouteKey] =
@@ -47,7 +48,8 @@ export function AuthenticatedRouter() {
       const { currentRouteKey: routeKey, overlayRoute: overlay } = navigationStateRef.current;
 
       if (overlay !== null) {
-        setOverlayRoute(null);
+        // O convite e aberto a partir da lista de cuidadores: voltar leva a ela.
+        setOverlayRoute(overlay === "add-caregiver" ? "caregivers" : null);
         return true;
       }
 
@@ -73,15 +75,20 @@ export function AuthenticatedRouter() {
 
   const renderContent = () => {
     if (overlayRoute === "add-caregiver") {
-      return <AddCaregiverScreen onNavigateBack={() => setOverlayRoute(null)} />;
+      return <AddCaregiverScreen onNavigateBack={() => setOverlayRoute("caregivers")} />;
+    }
+
+    if (overlayRoute === "caregivers") {
+      return (
+        <CaregiversScreen
+          onNavigateBack={() => setOverlayRoute(null)}
+          onNavigateToInvite={() => setOverlayRoute("add-caregiver")}
+        />
+      );
     }
 
     if (activeRoute.key === "perfil") {
-      return (
-        <ProfileScreen
-          onNavigateToAddCaregiver={() => setOverlayRoute("add-caregiver")}
-        />
-      );
+      return <ProfileScreen onNavigateToCaregivers={() => setOverlayRoute("caregivers")} />;
     }
 
     return <ActiveScreen />;

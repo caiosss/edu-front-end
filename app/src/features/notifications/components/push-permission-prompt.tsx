@@ -17,7 +17,7 @@ type PushPermissionPromptProps = {
  */
 export function PushPermissionPrompt({ visible, isCaregiver, onAccept, onDecline }: PushPermissionPromptProps) {
   const texto = isCaregiver
-    ? "Avisamos você quando uma dose da pessoa que você acompanha não for registrada no horário."
+    ? "Avisamos você no horário das doses da pessoa que você acompanha e quando uma dose não for registrada, se ela permitir."
     : "Avisamos você no horário de cada remédio, mesmo com o aplicativo fechado.";
 
   return (
