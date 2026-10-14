@@ -15,6 +15,7 @@ import {
 } from "react-hook-form";
 import { colors, MAX_FONT_SCALE, radius, spacing, touch, typography } from "../../theme";
 import { AppText } from "./app-text";
+import { useScrollToFocusedInput } from "./keyboard-aware-scroll-view";
 
 type TextFieldProps<TValues extends FieldValues> = {
   control: Control<TValues>;
@@ -44,6 +45,7 @@ export function TextField<TValues extends FieldValues>({
   editable = true,
 }: TextFieldProps<TValues>) {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const scrollToFocusedInput = useScrollToFocusedInput();
 
   return (
     <Controller
@@ -67,6 +69,7 @@ export function TextField<TValues extends FieldValues>({
             <TextInput
               value={typeof value === "string" ? value : ""}
               onBlur={onBlur}
+              onFocus={scrollToFocusedInput}
               onChangeText={onChange}
               placeholder={placeholder}
               placeholderTextColor={colors.textSecondary}

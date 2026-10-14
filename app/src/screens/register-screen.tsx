@@ -1,10 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo, useState } from "react";
 import {
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -27,7 +24,7 @@ import { useRegistrationStore } from "../features/register/store/use-registratio
 import type { RegistrationFormValues } from "../features/register/types";
 import { registrationSchema } from "../features/register/validation";
 import { registerUser } from "../services/registration-service";
-import { Logo } from "../components/ui";
+import { KeyboardAwareScrollView, Logo } from "../components/ui";
 import { toFriendlyMessage } from "../utils/friendly-error";
 
 type TransitionDirection = "forward" | "backward";
@@ -261,123 +258,118 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      <KeyboardAwareScrollView
         style={styles.keyboardView}
+        contentContainerStyle={styles.scrollContainer}
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContainer}
-          keyboardShouldPersistTaps="handled"
+        <Logo width={160} style={styles.logo} />
+        <Animated.View
+          entering={FadeInDown.duration(320)}
+          style={[styles.card, { width: containerWidth }]}
         >
-          <Logo width={160} style={styles.logo} />
-          <Animated.View
-            entering={FadeInDown.duration(320)}
-            style={[styles.card, { width: containerWidth }]}
-          >
-            <Text style={styles.pageTitle}>Cadastro</Text>
-            <Text style={styles.pageDescription}>
-              Preencha os seus dados em 2 etapas.
+          <Text style={styles.pageTitle}>Cadastro</Text>
+          <Text style={styles.pageDescription}>
+            Preencha os seus dados em 2 etapas.
+          </Text>
+
+          <ProgressIndicator
+            currentStep={currentStep}
+            totalSteps={2}
+            labels={stepLabels}
+          />
+
+          <View style={styles.stepHeader}>
+            <Text style={styles.stepTitle}>
+              {currentStep === 0
+                ? "Etapa 1 de 2: dados de acesso"
+                : "Etapa 2 de 2: dados do paciente"}
             </Text>
+          </View>
 
-            <ProgressIndicator
-              currentStep={currentStep}
-              totalSteps={2}
-              labels={stepLabels}
-            />
+          <Animated.View
+            key={`steps-${currentStep}`}
+            entering={
+              transitionDirection === "forward"
+                ? SlideInRight.duration(260)
+                : SlideInLeft.duration(260)
+            }
+            exiting={
+              transitionDirection === "forward"
+                ? SlideOutLeft.duration(220)
+                : SlideOutRight.duration(220)
+            }
+            style={styles.stepContainer}
+          >
+            {renderStepContent()}
+          </Animated.View>
 
-            <View style={styles.stepHeader}>
-              <Text style={styles.stepTitle}>
-                {currentStep === 0
-                  ? "Etapa 1 de 2: dados de acesso"
-                  : "Etapa 2 de 2: dados do paciente"}
-              </Text>
-            </View>
-
-            <Animated.View
-              key={`steps-${currentStep}`}
-              entering={
-                transitionDirection === "forward"
-                  ? SlideInRight.duration(260)
-                  : SlideInLeft.duration(260)
-              }
-              exiting={
-                transitionDirection === "forward"
-                  ? SlideOutLeft.duration(220)
-                  : SlideOutRight.duration(220)
-              }
-              style={styles.stepContainer}
+          {feedbackState !== "idle" ? (
+            <View
+              style={[
+                styles.feedbackBox,
+                feedbackState === "success"
+                  ? styles.feedbackSuccess
+                  : styles.feedbackError,
+              ]}
             >
-              {renderStepContent()}
-            </Animated.View>
-
-            {feedbackState !== "idle" ? (
-              <View
+              <Text
                 style={[
-                  styles.feedbackBox,
+                  styles.feedbackText,
                   feedbackState === "success"
-                    ? styles.feedbackSuccess
-                    : styles.feedbackError,
+                    ? styles.feedbackTextSuccess
+                    : styles.feedbackTextError,
                 ]}
               >
-                <Text
-                  style={[
-                    styles.feedbackText,
-                    feedbackState === "success"
-                      ? styles.feedbackTextSuccess
-                      : styles.feedbackTextError,
-                  ]}
-                >
-                  {feedbackMessage}
-                </Text>
-              </View>
-            ) : null}
-
-            <View style={styles.navigationRow}>
-              {currentStep === 0 ? (
-                <View style={styles.ghostButton} />
-              ) : (
-                <Pressable
-                  onPress={previousStep}
-                  style={[styles.actionButton, styles.secondaryButton]}
-                  disabled={isSubmitting}
-                >
-                  <Text style={[styles.actionText, styles.secondaryButtonText]}>Voltar</Text>
-                </Pressable>
-              )}
-
-              {currentStep === 0 ? (
-                <Pressable
-                  onPress={nextStep}
-                  style={[styles.actionButton, styles.primaryButton]}
-                  disabled={isSubmitting}
-                >
-                  <Text style={[styles.actionText, styles.primaryButtonText]}>Próximo</Text>
-                </Pressable>
-              ) : (
-                <Pressable
-                  onPress={finalizeRegistration}
-                  style={[styles.actionButton, styles.primaryButton]}
-                  disabled={isSubmitting || feedbackState === "success"}
-                >
-                  <Text style={[styles.actionText, styles.primaryButtonText]}>
-                    {isSubmitting ? "Finalizando..." : "Finalizar"}
-                  </Text>
-                </Pressable>
-              )}
+                {feedbackMessage}
+              </Text>
             </View>
+          ) : null}
 
-            {onNavigateToLogin ? (
+          <View style={styles.navigationRow}>
+            {currentStep === 0 ? (
+              <View style={styles.ghostButton} />
+            ) : (
               <Pressable
-                onPress={onNavigateToLogin}
-                style={styles.switchAuthAction}
+                onPress={previousStep}
+                style={[styles.actionButton, styles.secondaryButton]}
+                disabled={isSubmitting}
+              >
+                <Text style={[styles.actionText, styles.secondaryButtonText]}>Voltar</Text>
+              </Pressable>
+            )}
+
+            {currentStep === 0 ? (
+              <Pressable
+                onPress={nextStep}
+                style={[styles.actionButton, styles.primaryButton]}
+                disabled={isSubmitting}
+              >
+                <Text style={[styles.actionText, styles.primaryButtonText]}>Próximo</Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={finalizeRegistration}
+                style={[styles.actionButton, styles.primaryButton]}
                 disabled={isSubmitting || feedbackState === "success"}
               >
-                <Text style={styles.switchAuthText}>Já tem conta? Entrar</Text>
+                <Text style={[styles.actionText, styles.primaryButtonText]}>
+                  {isSubmitting ? "Finalizando..." : "Finalizar"}
+                </Text>
               </Pressable>
-            ) : null}
-          </Animated.View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+            )}
+          </View>
+
+          {onNavigateToLogin ? (
+            <Pressable
+              onPress={onNavigateToLogin}
+              style={styles.switchAuthAction}
+              disabled={isSubmitting || feedbackState === "success"}
+            >
+              <Text style={styles.switchAuthText}>Já tem conta? Entrar</Text>
+            </Pressable>
+          ) : null}
+        </Animated.View>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

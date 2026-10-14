@@ -6,6 +6,7 @@ import { CelebrationHost } from "../features/gamification/components/celebration
 import { AuthToolbar } from "../features/navigation/components/auth-toolbar";
 import { PushPermissionPrompt } from "../features/notifications/components/push-permission-prompt";
 import { useAuth } from "../hooks/useAuth";
+import { layout } from "../theme";
 import { usePushNotifications } from "../hooks/use-push-notifications";
 import AddCaregiverScreen from "../screens/add-caregiver-screen";
 import CaregiversScreen from "../screens/caregivers-screen";
@@ -97,24 +98,26 @@ export function AuthenticatedRouter() {
   return (
     <View style={styles.root}>
       <SafeAreaView style={styles.safeArea} edges={["top", "right", "left", "bottom"]}>
-        <View style={styles.contentArea}>
-          <Animated.View
-            key={contentKey}
-            entering={FadeIn.duration(190)}
-            exiting={FadeOut.duration(140)}
-            style={styles.screenContainer}
-          >
-            {renderContent()}
-          </Animated.View>
-        </View>
+        <View style={styles.contentColumn}>
+          <View style={styles.contentArea}>
+            <Animated.View
+              key={contentKey}
+              entering={FadeIn.duration(190)}
+              exiting={FadeOut.duration(140)}
+              style={styles.screenContainer}
+            >
+              {renderContent()}
+            </Animated.View>
+          </View>
 
-        {!isOverlayVisible ? (
-          <AuthToolbar
-            routes={authenticatedRoutes}
-            currentRouteKey={activeRoute.key}
-            onSelectRoute={setCurrentRouteKey}
-          />
-        ) : null}
+          {!isOverlayVisible ? (
+            <AuthToolbar
+              routes={authenticatedRoutes}
+              currentRouteKey={activeRoute.key}
+              onSelectRoute={setCurrentRouteKey}
+            />
+          ) : null}
+        </View>
       </SafeAreaView>
 
       {/* Fora da SafeAreaView para os modais cobrirem a tela inteira, inclusive a toolbar. */}
@@ -137,6 +140,12 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: "#EAF2FA",
+  },
+  contentColumn: {
+    flex: 1,
+    width: "100%",
+    maxWidth: layout.maxContentWidth,
+    alignSelf: "center",
   },
   contentArea: {
     flex: 1,

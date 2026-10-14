@@ -1,10 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMemo } from "react";
 import {
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -13,7 +10,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { useForm } from "react-hook-form";
-import { Logo } from "../components/ui";
+import { KeyboardAwareScrollView, Logo } from "../components/ui";
 import { AnimatedActionButton } from "../features/login/components/animated-action-button";
 import { LoginInput } from "../features/login/components/login-input";
 import { useLoginController } from "../features/login/hooks/use-login-controller";
@@ -57,102 +54,97 @@ export default function LoginScreen({
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      <KeyboardAwareScrollView
         style={styles.keyboardView}
+        contentContainerStyle={styles.scrollContainer}
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContainer}
-          keyboardShouldPersistTaps="handled"
+        <Logo width={180} style={styles.logo} />
+        <Animated.View
+          entering={FadeInDown.duration(320)}
+          style={[styles.card, { width: containerWidth }]}
         >
-          <Logo width={180} style={styles.logo} />
-          <Animated.View
-            entering={FadeInDown.duration(320)}
-            style={[styles.card, { width: containerWidth }]}
-          >
-            <Text style={styles.pageTitle}>Entrar</Text>
-            <Text style={styles.pageDescription}>
-              Acesse seu plano de cuidados e acompanhe desafios diários.
-            </Text>
+          <Text style={styles.pageTitle}>Entrar</Text>
+          <Text style={styles.pageDescription}>
+            Acesse seu plano de cuidados e acompanhe desafios diários.
+          </Text>
 
-            <Animated.View entering={FadeInUp.delay(60).duration(260)} style={styles.formGroup}>
-              <LoginInput
-                control={control}
-                name="email"
-                label="E-mail"
-                placeholder="voce@email.com"
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-              <LoginInput
-                control={control}
-                name="senha"
-                label="Senha"
-                placeholder="Digite sua senha"
-                isPassword
-                autoCapitalize="none"
-              />
-            </Animated.View>
+          <Animated.View entering={FadeInUp.delay(60).duration(260)} style={styles.formGroup}>
+            <LoginInput
+              control={control}
+              name="email"
+              label="E-mail"
+              placeholder="voce@email.com"
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <LoginInput
+              control={control}
+              name="senha"
+              label="Senha"
+              placeholder="Digite sua senha"
+              isPassword
+              autoCapitalize="none"
+            />
+          </Animated.View>
 
-            {feedbackState !== "idle" ? (
-              <Animated.View
-                entering={FadeInUp.duration(220)}
+          {feedbackState !== "idle" ? (
+            <Animated.View
+              entering={FadeInUp.duration(220)}
+              style={[
+                styles.feedbackBox,
+                feedbackState === "success"
+                  ? styles.feedbackSuccess
+                  : styles.feedbackError,
+              ]}
+            >
+              <Text
                 style={[
-                  styles.feedbackBox,
+                  styles.feedbackText,
                   feedbackState === "success"
-                    ? styles.feedbackSuccess
-                    : styles.feedbackError,
+                    ? styles.feedbackTextSuccess
+                    : styles.feedbackTextError,
                 ]}
               >
-                <Text
-                  style={[
-                    styles.feedbackText,
-                    feedbackState === "success"
-                      ? styles.feedbackTextSuccess
-                      : styles.feedbackTextError,
-                  ]}
-                >
-                  {feedbackMessage}
-                </Text>
-              </Animated.View>
+                {feedbackMessage}
+              </Text>
+            </Animated.View>
+          ) : null}
+
+          <View style={styles.actionGroup}>
+            <AnimatedActionButton
+              label={isSubmitting ? "Entrando..." : "Entrar"}
+              onPress={() => {
+                void submitCredentials();
+              }}
+              loading={isSubmitting}
+              disabled={isSubmitting}
+            />
+
+            {onNavigateToRegister ? (
+              <Pressable
+                onPress={handleNavigateToRegister}
+                style={styles.switchAuthAction}
+                disabled={isSubmitting}
+              >
+                <Text style={styles.switchAuthText}>Criar conta</Text>
+              </Pressable>
             ) : null}
 
-            <View style={styles.actionGroup}>
-              <AnimatedActionButton
-                label={isSubmitting ? "Entrando..." : "Entrar"}
+            {onNavigateToActivateInvite ? (
+              <Pressable
                 onPress={() => {
-                  void submitCredentials();
+                  clearFeedback();
+                  onNavigateToActivateInvite();
                 }}
-                loading={isSubmitting}
+                style={styles.switchAuthAction}
                 disabled={isSubmitting}
-              />
-
-              {onNavigateToRegister ? (
-                <Pressable
-                  onPress={handleNavigateToRegister}
-                  style={styles.switchAuthAction}
-                  disabled={isSubmitting}
-                >
-                  <Text style={styles.switchAuthText}>Criar conta</Text>
-                </Pressable>
-              ) : null}
-
-              {onNavigateToActivateInvite ? (
-                <Pressable
-                  onPress={() => {
-                    clearFeedback();
-                    onNavigateToActivateInvite();
-                  }}
-                  style={styles.switchAuthAction}
-                  disabled={isSubmitting}
-                >
-                  <Text style={styles.switchAuthText}>Sou cuidador e recebi um convite</Text>
-                </Pressable>
-              ) : null}
-            </View>
-          </Animated.View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+              >
+                <Text style={styles.switchAuthText}>Sou cuidador e recebi um convite</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </Animated.View>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

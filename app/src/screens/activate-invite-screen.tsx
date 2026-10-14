@@ -1,9 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo, useState } from "react";
 import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
   StyleSheet,
   useWindowDimensions,
 } from "react-native";
@@ -14,6 +11,7 @@ import {
   AppText,
   BigButton,
   Card,
+  KeyboardAwareScrollView,
   Logo,
   ScreenHeader,
   StatusBanner,
@@ -78,74 +76,69 @@ export default function ActivateInviteScreen({
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      <KeyboardAwareScrollView
         style={styles.keyboardView}
+        contentContainerStyle={styles.scrollContainer}
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContainer}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Logo width={150} />
-          <Animated.View entering={FadeInDown.duration(280)} style={{ width: containerWidth }}>
-            <Card>
-              <ScreenHeader
-                title="Aceitar convite"
-                subtitle="Você foi convidado para acompanhar o tratamento de um paciente. Crie a sua senha para entrar."
-                onBack={onNavigateToLogin}
-                backLabel="Voltar para entrar"
-              />
+        <Logo width={150} />
+        <Animated.View entering={FadeInDown.duration(280)} style={{ width: containerWidth }}>
+          <Card>
+            <ScreenHeader
+              title="Aceitar convite"
+              subtitle="Você foi convidado para acompanhar o tratamento de um paciente. Crie a sua senha para entrar."
+              onBack={onNavigateToLogin}
+              backLabel="Voltar para entrar"
+            />
 
-              {hasTokenFromLink ? (
-                <StatusBanner tone="success" message="Convite recebido pelo link do e-mail." />
-              ) : (
-                <TextField
-                  control={control}
-                  name="token"
-                  label="Link do convite"
-                  hint="Copie o link que chegou no seu e-mail e cole aqui."
-                  placeholder="educare://convite?token=..."
-                  autoCapitalize="none"
-                />
-              )}
-
+            {hasTokenFromLink ? (
+              <StatusBanner tone="success" message="Convite recebido pelo link do e-mail." />
+            ) : (
               <TextField
                 control={control}
-                name="senha"
-                label="Crie uma senha"
-                hint="Pelo menos 8 caracteres."
-                placeholder="Sua nova senha"
+                name="token"
+                label="Link do convite"
+                hint="Copie o link que chegou no seu e-mail e cole aqui."
+                placeholder="educare://convite?token=..."
                 autoCapitalize="none"
-                autoComplete="new-password"
-                isPassword
               />
-              <TextField
-                control={control}
-                name="confirmarSenha"
-                label="Repita a senha"
-                placeholder="Digite a senha de novo"
-                autoCapitalize="none"
-                autoComplete="new-password"
-                isPassword
-              />
+            )}
 
-              {errorMessage ? <StatusBanner tone="danger" message={errorMessage} /> : null}
+            <TextField
+              control={control}
+              name="senha"
+              label="Crie uma senha"
+              hint="Pelo menos 8 caracteres."
+              placeholder="Sua nova senha"
+              autoCapitalize="none"
+              autoComplete="new-password"
+              isPassword
+            />
+            <TextField
+              control={control}
+              name="confirmarSenha"
+              label="Repita a senha"
+              placeholder="Digite a senha de novo"
+              autoCapitalize="none"
+              autoComplete="new-password"
+              isPassword
+            />
 
-              <BigButton
-                label={isSubmitting ? "Ativando..." : "Criar senha e entrar"}
-                loading={isSubmitting}
-                disabled={isSubmitting}
-                onPress={() => void submitActivation()}
-              />
+            {errorMessage ? <StatusBanner tone="danger" message={errorMessage} /> : null}
 
-              <AppText variant="small" color="textSecondary">
-                O link vale por 72 horas e só pode ser usado uma vez. Se ele vencer, peça um novo
-                convite ao paciente.
-              </AppText>
-            </Card>
-          </Animated.View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+            <BigButton
+              label={isSubmitting ? "Ativando..." : "Criar senha e entrar"}
+              loading={isSubmitting}
+              disabled={isSubmitting}
+              onPress={() => void submitActivation()}
+            />
+
+            <AppText variant="small" color="textSecondary">
+              O link vale por 72 horas e só pode ser usado uma vez. Se ele vencer, peça um novo
+              convite ao paciente.
+            </AppText>
+          </Card>
+        </Animated.View>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

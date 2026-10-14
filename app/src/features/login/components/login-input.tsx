@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { Controller, type Control, type FieldPath } from "react-hook-form";
+import { useScrollToFocusedInput } from "../../../components/ui";
 import type { LoginFormValues } from "../types";
 
 type LoginInputProps = {
@@ -33,6 +34,7 @@ export function LoginInput({
   isPassword = false,
 }: LoginInputProps) {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const scrollToFocusedInput = useScrollToFocusedInput();
 
   return (
     <Controller
@@ -45,6 +47,7 @@ export function LoginInput({
             <TextInput
               value={value}
               onBlur={onBlur}
+              onFocus={scrollToFocusedInput}
               onChangeText={onChange}
               placeholder={placeholder}
               keyboardType={keyboardType}

@@ -14,6 +14,15 @@ export const radius = {
   pill: 999,
 } as const;
 
+/**
+ * Largura maxima do conteudo. Em tablet e celular dobravel as telas ficam centralizadas em vez
+ * de esticar cartoes e botoes ate as bordas, o que dificulta a leitura.
+ */
+export const layout = {
+  maxContentWidth: 640,
+  maxDialogWidth: 480,
+} as const;
+
 /** Areas de toque acima dos 48dp do Material, pensando em tremor e pouca precisao no toque. */
 export const touch = {
   min: 56,

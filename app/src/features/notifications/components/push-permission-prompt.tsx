@@ -1,7 +1,7 @@
 import { Modal, StyleSheet, View } from "react-native";
 import { BellRing } from "lucide-react-native";
 import { AppText, BigButton } from "../../../components/ui";
-import { colors, radius, spacing } from "../../../theme";
+import { colors, layout, radius, spacing } from "../../../theme";
 
 type PushPermissionPromptProps = {
   visible: boolean;
@@ -52,6 +52,9 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   card: {
+    width: "100%",
+    maxWidth: layout.maxDialogWidth,
+    alignSelf: "center",
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     padding: spacing.xl,

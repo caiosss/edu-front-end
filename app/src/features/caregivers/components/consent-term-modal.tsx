@@ -1,7 +1,7 @@
 import { ActivityIndicator, Modal, ScrollView, StyleSheet, View } from "react-native";
 import { ShieldCheck } from "lucide-react-native";
 import { AppText, BigButton, StatusBanner } from "../../../components/ui";
-import { colors, radius, spacing } from "../../../theme";
+import { colors, layout, radius, spacing } from "../../../theme";
 import type { ConsentTerm } from "../types";
 
 type ConsentTermModalProps = {
@@ -82,6 +82,9 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   card: {
+    width: "100%",
+    maxWidth: layout.maxDialogWidth,
+    alignSelf: "center",
     maxHeight: "90%",
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
