@@ -29,7 +29,8 @@ export const activateInviteSchema = z
   });
 
 /**
- * O e-mail traz o link `educare://convite?token=...` (`convite.link-base` no auth-service).
+ * O e-mail traz o link `https://<portal>/convite?token=...` (`convite.link-base` no auth-service),
+ * e a pagina do link mostra o codigo para copiar.
  * Aceita o link inteiro, colado de qualquer jeito, ou so o token.
  */
 export const extractInviteToken = (input: string): string => {

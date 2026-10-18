@@ -98,7 +98,7 @@ export default function ActivateInviteScreen({
                 name="token"
                 label="Link do convite"
                 hint="Copie o link que chegou no seu e-mail e cole aqui."
-                placeholder="educare://convite?token=..."
+                placeholder="Cole o link ou o código do convite"
                 autoCapitalize="none"
               />
             )}

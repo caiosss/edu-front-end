@@ -7,8 +7,9 @@ import RegisterScreen from "../screens/register-screen";
 type UnauthenticatedRoute = "login" | "register" | "activate-invite";
 
 /**
- * Token do link de convite do cuidador, `educare://convite?token=...` (`convite.link-base` no
- * auth-service, SPEC-014 §5.2).
+ * Token do link de convite do cuidador, `educare://convite?token=...`. O e-mail leva um link https
+ * (`convite.link-base` no auth-service, SPEC-014 §5.2) para a pagina /convite do portal, que abre
+ * o app com este deep link.
  */
 const parseInviteToken = (url: string | null): string | null => {
   if (!url) {
