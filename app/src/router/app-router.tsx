@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { ActivityIndicator, AppState, StyleSheet, View } from "react-native";
 import { Logo } from "../components/ui";
+import { TermsGate } from "../features/terms/components/terms-gate";
 import { useAuth } from "../hooks/useAuth";
 import { tokenValido } from "../services/session-storage";
 import { useAuthStore } from "../store/auth-store";
@@ -38,7 +39,11 @@ export function AppRouter() {
   }
 
   if (isAuthenticated) {
-    return <AuthenticatedRouter />;
+    return (
+      <TermsGate>
+        <AuthenticatedRouter />
+      </TermsGate>
+    );
   }
 
   return <UnauthenticatedRouter />;

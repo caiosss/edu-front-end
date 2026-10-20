@@ -54,4 +54,6 @@ export type RegisterPayload = {
   dataTransplante: string;
   telefone: string;
   relacao: string;
+  /** Versao dos Termos de Uso que a pessoa leu e aceitou no cadastro. */
+  termoUsoVersao?: number;
 };

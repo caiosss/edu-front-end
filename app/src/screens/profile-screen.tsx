@@ -8,11 +8,25 @@ import {
   View,
 } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { Bell, Eye, Flame, Gem, Heart, LogOut, Medal, Settings, UserRound } from "lucide-react-native";
+import {
+  Bell,
+  ChevronRight,
+  Eye,
+  Flame,
+  Gem,
+  Heart,
+  LockKeyhole,
+  LogOut,
+  Medal,
+  Settings,
+  ShieldCheck,
+  UserRound,
+} from "lucide-react-native";
 import { AnimatedXpBar } from "../features/gamification/components/animated-xp-bar";
 import { LevelRing } from "../features/gamification/components/level-ring";
 import { nivelRatio } from "../features/gamification/utils/level";
 import SettingItem from "../features/navigation/components/settings-item";
+import { TermsModal } from "../features/terms/components/terms-modal";
 import { useAuth } from "../hooks/useAuth";
 import { useCaregiverProfile } from "../hooks/use-caregiver-profile";
 import { usePatientProfile } from "../hooks/use-patient-profile";
@@ -80,6 +94,7 @@ export default function ProfileScreen({ onNavigateToCaregivers }: ProfileScreenP
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [accessibilityEnabled, setAccessibilityEnabled] = useState(false);
+  const [isTermsVisible, setIsTermsVisible] = useState(false);
   // Progresso vem do gamification-service; o `/pacientes/me` so traz os dados cadastrais.
   const { nivel: patientNivel, xpTotal, moedas, streak } = useGamification();
 
@@ -262,6 +277,46 @@ export default function ProfileScreen({ onNavigateToCaregivers }: ProfileScreenP
         </Pressable>
       ) : null}
 
+      <Animated.View entering={FadeInDown.delay(140).duration(250)} style={[styles.card, styles.privacyCard]}>
+        <View style={styles.privacyHeader}>
+          <View style={styles.privacyIcon}>
+            <ShieldCheck size={22} color="#17663A" />
+          </View>
+          <View style={styles.privacyTitleBlock}>
+            <Text style={styles.cardTitle}>
+              {isCaregiverUser ? "Os dados do paciente estão protegidos" : "Seus dados estão protegidos"}
+            </Text>
+            <Text style={styles.privacyBadge}>Conforme a LGPD</Text>
+          </View>
+        </View>
+
+        <Text style={styles.privacyText}>
+          {isCaregiverUser
+            ? "As informações de saúde do paciente viajam criptografadas e você só vê o que ele autorizou. Cada acesso fica registrado."
+            : "Suas informações de saúde viajam criptografadas e só são vistas por você, pela sua equipe de saúde e pelos cuidadores que você autorizar. Nunca vendemos seus dados."}
+        </Text>
+
+        <View style={styles.privacyPoints}>
+          <View style={styles.privacyPoint}>
+            <LockKeyhole size={14} color="#17663A" />
+            <Text style={styles.privacyPointText}>Senha guardada com criptografia</Text>
+          </View>
+          <View style={styles.privacyPoint}>
+            <LockKeyhole size={14} color="#17663A" />
+            <Text style={styles.privacyPointText}>Login salvo de forma protegida no aparelho</Text>
+          </View>
+        </View>
+
+        <Pressable
+          onPress={() => setIsTermsVisible(true)}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.privacyLink, pressed ? styles.privacyLinkPressed : null]}
+        >
+          <Text style={styles.privacyLinkText}>Termos de Uso e Política de Privacidade</Text>
+          <ChevronRight size={18} color="#1155AA" />
+        </Pressable>
+      </Animated.View>
+
       <Animated.View entering={FadeInDown.delay(180).duration(250)} style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={styles.headerLeft}>
@@ -297,6 +352,8 @@ export default function ProfileScreen({ onNavigateToCaregivers }: ProfileScreenP
         <LogOut size={16} color="#FFFFFF" />
         <Text style={styles.logoutText}>Sair da conta</Text>
       </Pressable>
+
+      <TermsModal visible={isTermsVisible} onClose={() => setIsTermsVisible(false)} />
     </ScrollView>
   );
 }
@@ -466,6 +523,76 @@ const styles = StyleSheet.create({
   },
   addCaregiverButtonText: {
     color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  privacyCard: {
+    borderWidth: 1,
+    borderColor: "#BFE3CC",
+    backgroundColor: "#F6FBF8",
+  },
+  privacyHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  privacyIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#E7F5EC",
+  },
+  privacyTitleBlock: {
+    flex: 1,
+    gap: 4,
+  },
+  privacyBadge: {
+    alignSelf: "flex-start",
+    color: "#17663A",
+    fontSize: 12,
+    fontWeight: "700",
+    backgroundColor: "#E7F5EC",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    overflow: "hidden",
+  },
+  privacyText: {
+    color: "#23405C",
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  privacyPoints: {
+    gap: 6,
+  },
+  privacyPoint: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  privacyPointText: {
+    color: "#23405C",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  privacyLink: {
+    minHeight: 48,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#D5E3F2",
+  },
+  privacyLinkPressed: {
+    backgroundColor: "#E6EFFA",
+  },
+  privacyLinkText: {
+    color: "#1155AA",
     fontSize: 14,
     fontWeight: "700",
   },

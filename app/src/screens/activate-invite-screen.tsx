@@ -19,6 +19,9 @@ import {
 } from "../components/ui";
 import type { ActivateInviteFormValues } from "../features/caregivers/types";
 import { activateInviteSchema, extractInviteToken } from "../features/caregivers/validation";
+import { TermsAcceptance } from "../features/terms/components/terms-acceptance";
+import { TermsModal } from "../features/terms/components/terms-modal";
+import { useTermsAcceptance } from "../features/terms/hooks/use-terms-acceptance";
 import { activateCaregiverInvite } from "../services/auth-service";
 import { colors, spacing } from "../theme";
 import { toFriendlyMessage } from "../utils/friendly-error";
@@ -41,6 +44,7 @@ export default function ActivateInviteScreen({
   const containerWidth = useMemo(() => Math.min(width - 24, 540), [width]);
   const [errorMessage, setErrorMessage] = useState("");
   const hasTokenFromLink = Boolean(initialToken);
+  const termos = useTermsAcceptance();
 
   const {
     control,
@@ -64,9 +68,18 @@ export default function ActivateInviteScreen({
   const submitActivation = handleSubmit(async (values) => {
     setErrorMessage("");
 
+    if (!termos.aceito) {
+      setErrorMessage("Para continuar, leia e aceite os Termos de Uso e a Política de Privacidade.");
+      return;
+    }
+
     try {
       // Ao ativar, a sessao e gravada e o app abre direto no Inicio do cuidador.
-      await activateCaregiverInvite(extractInviteToken(values.token), values.senha);
+      await activateCaregiverInvite(
+        extractInviteToken(values.token),
+        values.senha,
+        await termos.versaoParaEnviar()
+      );
     } catch (error) {
       setErrorMessage(
         toFriendlyMessage(error, "Não foi possível ativar o convite agora. Tente de novo.")
@@ -123,12 +136,19 @@ export default function ActivateInviteScreen({
               isPassword
             />
 
+            <TermsAcceptance
+              checked={termos.aceito}
+              onToggle={termos.alternar}
+              onOpenTerms={termos.abrirTermos}
+              disabled={isSubmitting}
+            />
+
             {errorMessage ? <StatusBanner tone="danger" message={errorMessage} /> : null}
 
             <BigButton
               label={isSubmitting ? "Ativando..." : "Criar senha e entrar"}
               loading={isSubmitting}
-              disabled={isSubmitting}
+              disabled={isSubmitting || !termos.aceito}
               onPress={() => void submitActivation()}
             />
 
@@ -139,6 +159,11 @@ export default function ActivateInviteScreen({
           </Card>
         </Animated.View>
       </KeyboardAwareScrollView>
+      <TermsModal
+        visible={termos.isModalVisible}
+        onClose={termos.fecharTermos}
+        onLoaded={termos.aoCarregar}
+      />
     </SafeAreaView>
   );
 }
