@@ -28,6 +28,23 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 });
 
 /**
+ * 401 com o token da sessao: ele venceu ou foi recusado pelo gateway. Volta para o login em vez
+ * de deixar cada tela mostrar o proprio erro. Respostas a um token ja trocado sao ignoradas.
+ */
+api.interceptors.response.use(undefined, (error) => {
+  if (axios.isAxiosError(error) && error.response?.status === 401) {
+    const enviado = AxiosHeaders.from(error.config?.headers ?? {}).get("Authorization");
+    const { token, clearToken } = useAuthStore.getState();
+
+    if (token && enviado === `Bearer ${token}`) {
+      clearToken();
+    }
+  }
+
+  return Promise.reject(error);
+});
+
+/**
  * Os GlobalExceptionHandler dos servicos respondem erros de negocio com o texto puro da
  * excecao (ex.: 409 "Esta dose já foi registrada."). Devolve esse texto quando existir.
  */
