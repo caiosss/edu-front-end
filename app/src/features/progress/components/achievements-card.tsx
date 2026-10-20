@@ -14,10 +14,17 @@ type AchievementsCardProps = {
   recentes: Conquista[];
   todas: Conquista[];
   onSeeAll: () => void;
+  /** Primeiro nome do paciente quando quem olha e o cuidador. */
+  pacienteNome?: string | null;
 };
 
 /** Bloco de conquistas (SPEC-007 §5.1): as obtidas e as que estao em andamento. */
-export function AchievementsCard({ recentes, todas, onSeeAll }: AchievementsCardProps) {
+export function AchievementsCard({
+  recentes,
+  todas,
+  onSeeAll,
+  pacienteNome = null,
+}: AchievementsCardProps) {
   const emAndamento = useMemo(
     () =>
       todas
@@ -49,7 +56,9 @@ export function AchievementsCard({ recentes, todas, onSeeAll }: AchievementsCard
 
       {obtidas.length === 0 && emAndamento.length === 0 ? (
         <Text style={styles.supportingText}>
-          Suas conquistas aparecem aqui conforme você registra seus cuidados.
+          {pacienteNome
+            ? `As conquistas de ${pacienteNome} aparecem aqui conforme os cuidados são registrados.`
+            : "Suas conquistas aparecem aqui conforme você registra seus cuidados."}
         </Text>
       ) : null}
 

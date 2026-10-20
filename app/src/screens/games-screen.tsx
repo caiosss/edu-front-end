@@ -13,6 +13,7 @@ import {
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { Puzzle, History, Info, RefreshCw } from "lucide-react-native";
 import { AssociationRound } from "../features/games/components/association-round";
+import { CaregiverGamesView } from "../features/games/components/caregiver-games-view";
 import { GameCard } from "../features/games/components/game-card";
 import { MultipleChoiceRound } from "../features/games/components/multiple-choice-round";
 import { MyDayRound } from "../features/games/components/my-day-round";
@@ -28,6 +29,7 @@ import type {
 import { formatDateBr } from "../features/gamification/utils/format";
 import { syncGamificationAfterReward, useGamification } from "../hooks/use-gamification";
 import { useGamesLobby } from "../hooks/use-games";
+import { useAuth } from "../hooks/useAuth";
 import {
   GameNetworkError,
   startGameRound,
@@ -68,6 +70,7 @@ type Fase =
 /** Jogos de educacao terapeutica (SPEC-012): treino da propria prescricao, sempre facil. */
 export default function GamesScreen() {
   const { isPatient } = useGamification();
+  const { tipoUsuario } = useAuth();
   const lobby = useGamesLobby(isPatient);
   const [fase, setFase] = useState<Fase>({ tipo: "lobby" });
   const [abrindo, setAbrindo] = useState<Jogo | null>(null);
@@ -166,6 +169,10 @@ export default function GamesScreen() {
       setIsRefreshing(false);
     }
   }, [lobby]);
+
+  if (tipoUsuario === "CUIDADOR") {
+    return <CaregiverGamesView />;
+  }
 
   if (!isPatient) {
     return (

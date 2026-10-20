@@ -96,10 +96,15 @@ export const loginUser = async (payload: LoginPayload): Promise<LoginResult> => 
  */
 export const activateCaregiverInvite = async (
   token: string,
-  senha: string
+  senha: string,
+  termoUsoVersao: number
 ): Promise<LoginResult> => {
   try {
-    const response = await api.post("/auth/convites/ativar", { token: token.trim(), senha });
+    const response = await api.post("/auth/convites/ativar", {
+      token: token.trim(),
+      senha,
+      termoUsoVersao,
+    });
     const session = normalizeLoginResponse(response.data);
     useAuthStore.getState().setSession(session);
     return session;

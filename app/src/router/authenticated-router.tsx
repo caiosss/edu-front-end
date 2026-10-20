@@ -3,6 +3,7 @@ import { BackHandler, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { CelebrationHost } from "../features/gamification/components/celebration-host";
+import { ConsentTermModal } from "../features/caregivers/components/consent-term-modal";
 import { AuthToolbar } from "../features/navigation/components/auth-toolbar";
 import { PushPermissionPrompt } from "../features/notifications/components/push-permission-prompt";
 import { useAuth } from "../hooks/useAuth";
@@ -25,7 +26,7 @@ export function AuthenticatedRouter() {
   const { tipoUsuario } = useAuth();
 
   // Tocar num lembrete leva ao Inicio, onde estao as doses e missoes do dia.
-  const { convitePendente, aceitarConvite, recusarConvite } = usePushNotifications({
+  const push = usePushNotifications({
     onAbrirNotificacao: () => {
       setOverlayRoute(null);
       setCurrentRouteKey("inicio");
@@ -123,10 +124,19 @@ export function AuthenticatedRouter() {
       {/* Fora da SafeAreaView para os modais cobrirem a tela inteira, inclusive a toolbar. */}
       <CelebrationHost />
       <PushPermissionPrompt
-        visible={convitePendente}
+        visible={push.convitePendente}
         isCaregiver={tipoUsuario === "CUIDADOR"}
-        onAccept={aceitarConvite}
-        onDecline={recusarConvite}
+        onAccept={push.aceitarConvite}
+        onDecline={push.recusarConvite}
+      />
+      <ConsentTermModal
+        visible={push.termoPendente}
+        term={push.termo}
+        isLoading={push.carregandoTermo}
+        isSubmitting={push.salvandoTermo}
+        errorMessage={push.erroTermo}
+        onAccept={() => void push.aceitarTermo()}
+        onDecline={push.recusarTermo}
       />
     </View>
   );

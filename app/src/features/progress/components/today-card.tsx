@@ -9,6 +9,8 @@ import { pluralize } from "../labels";
 type TodayCardProps = {
   hoje: ResumoHoje | null;
   onRetry: () => void;
+  /** Primeiro nome do paciente quando quem olha e o cuidador. */
+  pacienteNome?: string | null;
 };
 
 const MAX_DOTS = 12;
@@ -17,7 +19,7 @@ const MAX_DOTS = 12;
  * Bloco "Hoje" (SPEC-007 §5.1): o concreto e clinico, e o maior numero da tela. Conta o que
  * foi registrado, nunca o que faltou.
  */
-export function TodayCard({ hoje, onRetry }: TodayCardProps) {
+export function TodayCard({ hoje, onRetry, pacienteNome = null }: TodayCardProps) {
   return (
     <View style={styles.card}>
       <Text style={styles.eyebrow}>Hoje</Text>
@@ -33,8 +35,9 @@ export function TodayCard({ hoje, onRetry }: TodayCardProps) {
         </View>
       ) : hoje.dosesPrevistas === 0 && hoje.missoesPrevistas === 0 ? (
         <Text style={styles.supportingText}>
-          Quando sua equipe de saúde cadastrar seus medicamentos, as doses de hoje aparecem
-          aqui.
+          {pacienteNome
+            ? `Quando a equipe de saúde cadastrar os medicamentos de ${pacienteNome}, as doses de hoje aparecem aqui.`
+            : "Quando sua equipe de saúde cadastrar seus medicamentos, as doses de hoje aparecem aqui."}
         </Text>
       ) : (
         <Animated.View entering={FadeIn.duration(260)} style={styles.content}>

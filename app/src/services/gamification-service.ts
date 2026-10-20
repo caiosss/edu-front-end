@@ -216,10 +216,22 @@ export const fetchGamificationProfile = async (): Promise<GamificationProfile> =
   }
 };
 
+/**
+ * Prefixo das leituras de progresso. Sem `pacienteId`, o paciente do token; com ele, as rotas
+ * do cuidador com VER_PROGRESSO (`/gamification/pacientes/{id}/...`), que respondem 403 sem a
+ * permissao.
+ */
+const progressPath = (rota: string, pacienteId?: string | null) =>
+  pacienteId
+    ? `/gamification/pacientes/${encodeURIComponent(pacienteId)}/${rota}`
+    : `/gamification/${rota}`;
+
 /** `GET /gamification/conquistas`: catalogo ativo, com desbloqueio e progresso parcial. */
-export const fetchGamificationAchievements = async (): Promise<Conquista[]> => {
+export const fetchGamificationAchievements = async (
+  pacienteId?: string | null
+): Promise<Conquista[]> => {
   try {
-    const response = await api.get("/gamification/conquistas");
+    const response = await api.get(progressPath("conquistas", pacienteId));
 
     if (!Array.isArray(response.data)) {
       throw new Error("Resposta de conquistas inválida.");
@@ -235,10 +247,11 @@ export const fetchGamificationAchievements = async (): Promise<Conquista[]> => {
 
 /** `GET /gamification/resumo?periodo=SEMANA|MES`: a tela de Progresso numa chamada. */
 export const fetchProgressSummary = async (
-  periodo: PeriodoResumo
+  periodo: PeriodoResumo,
+  pacienteId?: string | null
 ): Promise<ResumoProgresso> => {
   try {
-    const response = await api.get("/gamification/resumo", { params: { periodo } });
+    const response = await api.get(progressPath("resumo", pacienteId), { params: { periodo } });
     const resumo = asObject(response.data);
     const nivel = asObject(resumo?.nivel);
 
@@ -272,9 +285,12 @@ export const fetchProgressSummary = async (
  * `GET /gamification/extrato?page=`: `Page<ExtratoLinha>` do Spring. Aceita o formato direto
  * (`last`, `number`) e o de DTO (`page.number`, `page.totalPages`).
  */
-export const fetchRewardStatement = async (page: number): Promise<ExtratoPagina> => {
+export const fetchRewardStatement = async (
+  page: number,
+  pacienteId?: string | null
+): Promise<ExtratoPagina> => {
   try {
-    const response = await api.get("/gamification/extrato", { params: { page } });
+    const response = await api.get(progressPath("extrato", pacienteId), { params: { page } });
     const pagina = asObject(response.data);
 
     if (!pagina || !Array.isArray(pagina.content)) {

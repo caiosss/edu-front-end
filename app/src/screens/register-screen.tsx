@@ -23,6 +23,9 @@ import { buildRegisterPayload } from "../features/register/payload";
 import { useRegistrationStore } from "../features/register/store/use-registration-store";
 import type { RegistrationFormValues } from "../features/register/types";
 import { registrationSchema } from "../features/register/validation";
+import { TermsAcceptance } from "../features/terms/components/terms-acceptance";
+import { TermsModal } from "../features/terms/components/terms-modal";
+import { useTermsAcceptance } from "../features/terms/hooks/use-terms-acceptance";
 import { registerUser } from "../services/registration-service";
 import { KeyboardAwareScrollView, Logo } from "../components/ui";
 import { toFriendlyMessage } from "../utils/friendly-error";
@@ -85,6 +88,7 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
     useState<TransitionDirection>("forward");
   const [feedbackState, setFeedbackState] = useState<FeedbackState>("idle");
   const [feedbackMessage, setFeedbackMessage] = useState("");
+  const termos = useTermsAcceptance();
 
   const {
     control,
@@ -150,6 +154,7 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
     );
 
     try {
+      payload.termoUsoVersao = await termos.versaoParaEnviar();
       await registerUser(payload);
       setFeedbackState("success");
       setFeedbackMessage("Cadastro concluído! Agora é só entrar.");
@@ -171,6 +176,12 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
     });
 
     if (!isStepTwoValid) {
+      return;
+    }
+
+    if (!termos.aceito) {
+      setFeedbackState("error");
+      setFeedbackMessage("Para criar a conta, leia e aceite os Termos de Uso e a Política de Privacidade.");
       return;
     }
 
@@ -253,7 +264,17 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
       );
     }
 
-    return renderPatientFields();
+    return (
+      <>
+        {renderPatientFields()}
+        <TermsAcceptance
+          checked={termos.aceito}
+          onToggle={termos.alternar}
+          onOpenTerms={termos.abrirTermos}
+          disabled={isSubmitting || feedbackState === "success"}
+        />
+      </>
+    );
   };
 
   return (
@@ -370,6 +391,11 @@ export default function RegisterScreen({ onNavigateToLogin }: RegisterScreenProp
           ) : null}
         </Animated.View>
       </KeyboardAwareScrollView>
+      <TermsModal
+        visible={termos.isModalVisible}
+        onClose={termos.fecharTermos}
+        onLoaded={termos.aoCarregar}
+      />
     </SafeAreaView>
   );
 }

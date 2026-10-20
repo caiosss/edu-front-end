@@ -12,6 +12,8 @@ type RewardsCardProps = {
   recompensas: ExtratoLinha[];
   onOpenReward: (linha: ExtratoLinha) => void;
   onSeeStatement: () => void;
+  /** Primeiro nome do paciente quando quem olha e o cuidador. */
+  pacienteNome?: string | null;
 };
 
 /**
@@ -24,6 +26,7 @@ export function RewardsCard({
   recompensas,
   onOpenReward,
   onSeeStatement,
+  pacienteNome = null,
 }: RewardsCardProps) {
   const xpDoNivel = nivel.xpNoNivel + nivel.xpParaProximo;
 
@@ -32,7 +35,9 @@ export function RewardsCard({
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Sparkles size={16} color="#6741D9" />
-          <Text style={styles.eyebrow}>Suas recompensas</Text>
+          <Text style={styles.eyebrow}>
+            {pacienteNome ? `Recompensas de ${pacienteNome}` : "Suas recompensas"}
+          </Text>
         </View>
         <Pressable
           onPress={onSeeStatement}
@@ -67,7 +72,9 @@ export function RewardsCard({
 
       {recompensas.length === 0 ? (
         <Text style={styles.supportingText}>
-          Suas recompensas aparecem aqui depois dos primeiros registros.
+          {pacienteNome
+            ? `As recompensas de ${pacienteNome} aparecem aqui depois dos primeiros registros.`
+            : "Suas recompensas aparecem aqui depois dos primeiros registros."}
         </Text>
       ) : (
         <View style={styles.list}>

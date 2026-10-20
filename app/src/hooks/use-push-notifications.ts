@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
+import type { ConsentTerm } from "../features/caregivers/types";
+import { fetchConsentTerm, grantConsent, hasActiveConsent } from "../services/consent-service";
 import {
   configurarNotificacoes,
   marcarNotificacaoAberta,
   registrarAparelho,
 } from "../services/push-service";
+import { useAuthStore } from "../store/auth-store";
 import { usePushStore } from "../store/push-store";
+import { toFriendlyMessage } from "../utils/friendly-error";
 
 type Opcoes = {
   /** Chamado quando a pessoa toca numa notificacao (com o app aberto ou fechado). */
@@ -19,9 +23,20 @@ type Opcoes = {
  * Nao pede a permissao do sistema de cara: primeiro mostra um convite explicando para que
  * serve (`convitePendente`). O pedido seco do Android, sem contexto, costuma ser negado, e
  * depois de negado o app nao pode pedir de novo.
+ *
+ * Para o paciente, a permissao do aparelho nao basta: o notification-service so envia com o
+ * termo NOTIFICACAO vigente (SPEC-005 §5.4) e, sem ele, suprime todo lembrete em silencio.
+ * Com a permissao dada e o termo ausente, o app mostra o texto do termo (`termoPendente`).
+ * O cuidador nao tem termo proprio: vale o consentimento do paciente que ele acompanha.
  */
 export function usePushNotifications({ onAbrirNotificacao }: Opcoes) {
   const [convitePendente, setConvitePendente] = useState(false);
+  const [termoPendente, setTermoPendente] = useState(false);
+  const [termo, setTermo] = useState<ConsentTerm | null>(null);
+  const [carregandoTermo, setCarregandoTermo] = useState(false);
+  const [salvandoTermo, setSalvandoTermo] = useState(false);
+  const [erroTermo, setErroTermo] = useState("");
+  const ehPaciente = useAuthStore((s) => s.tipoUsuario) === "PACIENTE";
   const setDispositivoId = usePushStore((s) => s.setDispositivoId);
   const onAbrirRef = useRef(onAbrirNotificacao);
   onAbrirRef.current = onAbrirNotificacao;
@@ -35,6 +50,32 @@ export function usePushNotifications({ onAbrirNotificacao }: Opcoes) {
       console.warn("Nao foi possivel registrar o aparelho para notificacoes", erro);
     }
   }, [setDispositivoId]);
+
+  /** Abre o termo se o paciente ainda nao autorizou. Sem resposta do backend, nao insiste. */
+  const conferirTermo = useCallback(async () => {
+    if (!ehPaciente || Platform.OS !== "android") {
+      return;
+    }
+    try {
+      if (await hasActiveConsent("NOTIFICACAO")) {
+        return;
+      }
+    } catch (erro) {
+      console.warn("Nao foi possivel conferir o consentimento de notificacao", erro);
+      return;
+    }
+
+    setErroTermo("");
+    setTermoPendente(true);
+    setCarregandoTermo(true);
+    try {
+      setTermo(await fetchConsentTerm("NOTIFICACAO"));
+    } catch (erro) {
+      setErroTermo(toFriendlyMessage(erro, "Não foi possível carregar a autorização."));
+    } finally {
+      setCarregandoTermo(false);
+    }
+  }, [ehPaciente]);
 
   useEffect(() => {
     let ativo = true;
@@ -56,6 +97,7 @@ export function usePushNotifications({ onAbrirNotificacao }: Opcoes) {
 
       if (permissao.granted) {
         await registrar();
+        if (ativo) await conferirTermo();
       } else if (permissao.canAskAgain && Platform.OS === "android") {
         setConvitePendente(true);
       }
@@ -76,17 +118,46 @@ export function usePushNotifications({ onAbrirNotificacao }: Opcoes) {
       assinaturaToken.remove();
       assinaturaToque.remove();
     };
-  }, [registrar]);
+  }, [registrar, conferirTermo]);
 
   const aceitarConvite = useCallback(async () => {
     setConvitePendente(false);
     const resposta = await Notifications.requestPermissionsAsync();
     if (resposta.granted) {
       await registrar();
+      await conferirTermo();
     }
-  }, [registrar]);
+  }, [registrar, conferirTermo]);
 
   const recusarConvite = useCallback(() => setConvitePendente(false), []);
 
-  return { convitePendente, aceitarConvite, recusarConvite };
+  const aceitarTermo = useCallback(async () => {
+    setSalvandoTermo(true);
+    setErroTermo("");
+    try {
+      // O backend reprojeta as doses do paciente ao receber a concessao.
+      await grantConsent("NOTIFICACAO");
+      setTermoPendente(false);
+    } catch (erro) {
+      setErroTermo(toFriendlyMessage(erro, "Não foi possível salvar a autorização."));
+    } finally {
+      setSalvandoTermo(false);
+    }
+  }, []);
+
+  // Recusar nao revoga nada: o termo volta no proximo login.
+  const recusarTermo = useCallback(() => setTermoPendente(false), []);
+
+  return {
+    convitePendente,
+    aceitarConvite,
+    recusarConvite,
+    termoPendente,
+    termo,
+    carregandoTermo,
+    salvandoTermo,
+    erroTermo,
+    aceitarTermo,
+    recusarTermo,
+  };
 }

@@ -39,7 +39,8 @@
           "color": "#1155AA",
           "defaultChannel": "lembretes"
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "scheme": "educare",
     "extra": {
