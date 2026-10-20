@@ -15,7 +15,11 @@ type CachedSummary = {
  * Ultimo resumo bom por periodo. Offline, a tela mostra este com a marca "atualizado as HH:MM"
  * (SPEC-007 §5.5) em vez de uma tela em branco.
  */
-const cache = new Map<PeriodoResumo, CachedSummary>();
+const cache = new Map<string, CachedSummary>();
+
+/** O cuidador ve o resumo de outro paciente: o cache separa os dois. */
+const cacheKey = (periodo: PeriodoResumo, pacienteId: string | null) =>
+  `${pacienteId ?? "eu"}:${periodo}`;
 
 type UseProgressSummaryResult = {
   resumo: ResumoProgresso | null;
@@ -29,10 +33,13 @@ type UseProgressSummaryResult = {
 
 export function useProgressSummary(
   periodo: PeriodoResumo,
-  enabled: boolean
+  enabled: boolean,
+  /** Paciente acompanhado pelo cuidador. Nulo = o proprio paciente do token. */
+  pacienteId: string | null = null
 ): UseProgressSummaryResult {
   const token = useAuthStore((state) => state.token);
-  const cached = token ? cache.get(periodo) : undefined;
+  const chave = cacheKey(periodo, pacienteId);
+  const cached = token ? cache.get(chave) : undefined;
   const cachedForSession = cached && cached.token === token ? cached : null;
 
   const [resumo, setResumo] = useState<ResumoProgresso | null>(cachedForSession?.resumo ?? null);
@@ -47,7 +54,7 @@ export function useProgressSummary(
       return;
     }
 
-    const guardado = cache.get(periodo);
+    const guardado = cache.get(chave);
 
     if (guardado && guardado.token === token) {
       setResumo(guardado.resumo);
@@ -58,16 +65,21 @@ export function useProgressSummary(
     setErrorMessage("");
 
     try {
-      const novoResumo = await fetchProgressSummary(periodo);
+      const novoResumo = await fetchProgressSummary(periodo, pacienteId);
 
       if (useAuthStore.getState().token !== token) {
         return;
       }
 
       const agora = new Date();
-      cache.set(periodo, { token, resumo: novoResumo, atualizadoEm: agora });
+      cache.set(chave, { token, resumo: novoResumo, atualizadoEm: agora });
       setResumo(novoResumo);
       setAtualizadoEm(agora);
+
+      // O placar do topo e do proprio paciente; o resumo de quem o cuidador acompanha nao entra.
+      if (pacienteId) {
+        return;
+      }
 
       const store = useGamificationStore.getState();
       store.hydrateFromProfile({
@@ -83,7 +95,7 @@ export function useProgressSummary(
     } finally {
       setIsLoading(false);
     }
-  }, [enabled, periodo, token]);
+  }, [chave, enabled, pacienteId, periodo, token]);
 
   useEffect(() => {
     void refresh();

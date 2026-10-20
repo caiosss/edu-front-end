@@ -12,7 +12,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import { ChevronLeft, CloudOff, Info, Medal } from "lucide-react-native";
+import { ChevronLeft, CloudOff, HeartHandshake, Info, Medal } from "lucide-react-native";
 import { AchievementBadge } from "../features/gamification/components/achievement-badge";
 import type { ExtratoLinha, PeriodoResumo } from "../features/gamification/types";
 import { formatClock } from "../features/gamification/utils/format";
@@ -23,6 +23,7 @@ import { RewardsCard } from "../features/progress/components/rewards-card";
 import { TodayCard } from "../features/progress/components/today-card";
 import { TrendCard } from "../features/progress/components/trend-card";
 import { achievementProgressRatio } from "../features/progress/labels";
+import { useCaregiverPatient, usePatientAchievements } from "../hooks/use-caregiver-patient";
 import { useGamification } from "../hooks/use-gamification";
 import { useProgressSummary } from "../hooks/use-progress-summary";
 import { useRewardStatement } from "../hooks/use-reward-statement";
@@ -58,7 +59,14 @@ function SubviewHeader({ title, onBack }: { title: string; onBack: () => void })
  */
 export default function ProgressScreen() {
   const { width } = useWindowDimensions();
-  const { isPatient, conquistas, refreshGamification } = useGamification();
+  const { isPatient, conquistas: minhasConquistas, refreshGamification } = useGamification();
+  // O cuidador com VER_PROGRESSO ve a mesma tela, sobre o paciente que acompanha (SPEC-014).
+  const cuidador = useCaregiverPatient();
+  const alvoId = cuidador.isCaregiver ? cuidador.pacienteId : null;
+  const pacienteNome = cuidador.isCaregiver ? cuidador.pacienteNome ?? "o paciente" : null;
+  const podeVer = isPatient || Boolean(alvoId);
+  const doPaciente = usePatientAchievements(alvoId);
+  const conquistas = cuidador.isCaregiver ? doPaciente.conquistas : minhasConquistas;
   const [periodo, setPeriodo] = useState<PeriodoResumo>("SEMANA");
   const [view, setView] = useState<ProgressView>("resumo");
   const [recompensaAberta, setRecompensaAberta] = useState<ExtratoLinha | null>(null);
@@ -66,9 +74,10 @@ export default function ProgressScreen() {
 
   const { resumo, atualizadoEm, isLoading, errorMessage, isStale, refresh } = useProgressSummary(
     periodo,
-    isPatient
+    podeVer,
+    alvoId
   );
-  const extrato = useRewardStatement(isPatient && view === "extrato");
+  const extrato = useRewardStatement(podeVer && view === "extrato", alvoId);
 
   useEffect(() => {
     if (view === "resumo") {
@@ -89,11 +98,14 @@ export default function ProgressScreen() {
     setIsRefreshing(true);
 
     try {
-      await Promise.all([refresh(), refreshGamification()]);
+      await Promise.all([
+        refresh(),
+        cuidador.isCaregiver ? doPaciente.refresh() : refreshGamification(),
+      ]);
     } finally {
       setIsRefreshing(false);
     }
-  }, [refresh, refreshGamification]);
+  }, [cuidador.isCaregiver, doPaciente, refresh, refreshGamification]);
 
   const proximaConquista = useMemo(
     () =>
@@ -105,17 +117,38 @@ export default function ProgressScreen() {
     [conquistas]
   );
 
-  if (!isPatient) {
+  if (!podeVer) {
+    if (cuidador.isCaregiver && cuidador.isLoading) {
+      return (
+        <View style={styles.emptyContainer}>
+          <ActivityIndicator color="#2C7BE5" />
+        </View>
+      );
+    }
+
     return (
       <View style={styles.emptyContainer}>
         <Animated.View entering={FadeInDown.duration(240)} style={styles.emptyCard}>
           <View style={styles.emptyIcon}>
             <Medal size={28} color="#2C7BE5" />
           </View>
-          <Text style={styles.emptyTitle}>Disponível para pacientes</Text>
-          <Text style={styles.supportingText}>
-            O progresso acompanha os registros de cuidado de cada paciente.
+          <Text style={styles.emptyTitle}>
+            {cuidador.isCaregiver ? "Progresso do paciente" : "Disponível para pacientes"}
           </Text>
+          <Text style={[styles.supportingText, styles.centeredText]}>
+            {cuidador.mensagemSemAcesso ||
+              cuidador.errorMessage ||
+              "O progresso acompanha os registros de cuidado de cada paciente."}
+          </Text>
+          {cuidador.isCaregiver ? (
+            <Pressable
+              onPress={() => void cuidador.refresh()}
+              accessibilityRole="button"
+              style={[styles.retryButton, styles.centeredButton]}
+            >
+              <Text style={styles.retryText}>Conferir de novo</Text>
+            </Pressable>
+          ) : null}
         </Animated.View>
       </View>
     );
@@ -178,7 +211,10 @@ export default function ProgressScreen() {
               <ActivityIndicator color="#2C7BE5" style={styles.listLoading} />
             ) : (
               <Text style={styles.supportingText}>
-                {extrato.errorMessage || "Suas recompensas aparecem aqui depois dos primeiros registros."}
+                {extrato.errorMessage ||
+                  (pacienteNome
+                    ? `As recompensas de ${pacienteNome} aparecem aqui depois dos primeiros registros.`
+                    : "Suas recompensas aparecem aqui depois dos primeiros registros.")}
               </Text>
             )
           }
@@ -205,6 +241,13 @@ export default function ProgressScreen() {
           />
         }
       >
+        {pacienteNome ? (
+          <View style={styles.watchingBanner}>
+            <HeartHandshake size={18} color="#1155AA" />
+            <Text style={styles.watchingText}>Você está vendo o progresso de {pacienteNome}</Text>
+          </View>
+        ) : null}
+
         {isStale && atualizadoEm ? (
           <View style={styles.staleBanner} accessibilityLiveRegion="polite">
             <CloudOff size={16} color="#35506B" />
@@ -215,14 +258,18 @@ export default function ProgressScreen() {
         {!resumo && isLoading ? (
           <View style={styles.loadingBlock}>
             <ActivityIndicator color="#2C7BE5" />
-            <Text style={styles.supportingText}>Carregando seu progresso...</Text>
+            <Text style={styles.supportingText}>
+              {pacienteNome ? `Carregando o progresso de ${pacienteNome}...` : "Carregando seu progresso..."}
+            </Text>
           </View>
         ) : null}
 
         {!resumo && !isLoading && errorMessage ? (
           <View style={styles.errorCard}>
             <Text style={styles.supportingText}>
-              Não foi possível carregar seu progresso agora.
+              {pacienteNome
+                ? `Não foi possível carregar o progresso de ${pacienteNome} agora.`
+                : "Não foi possível carregar seu progresso agora."}
             </Text>
             <Pressable onPress={() => void refresh()} accessibilityRole="button" style={styles.retryButton}>
               <Text style={styles.retryText}>Tentar de novo</Text>
@@ -233,7 +280,11 @@ export default function ProgressScreen() {
         {resumo ? (
           <>
             <Animated.View entering={FadeInDown.duration(260)}>
-              <TodayCard hoje={resumo.hoje} onRetry={() => void refresh()} />
+              <TodayCard
+                hoje={resumo.hoje}
+                onRetry={() => void refresh()}
+                pacienteNome={pacienteNome}
+              />
             </Animated.View>
 
             <Animated.View entering={FadeInDown.delay(70).duration(260)}>
@@ -243,6 +294,7 @@ export default function ProgressScreen() {
                 tipo={periodo}
                 onChangeTipo={setPeriodo}
                 onRetry={() => void refresh()}
+                pacienteNome={pacienteNome}
               />
             </Animated.View>
 
@@ -251,6 +303,7 @@ export default function ProgressScreen() {
                 recentes={resumo.conquistasRecentes}
                 todas={conquistas}
                 onSeeAll={() => setView("conquistas")}
+                pacienteNome={pacienteNome}
               />
             </Animated.View>
 
@@ -261,14 +314,16 @@ export default function ProgressScreen() {
                 recompensas={resumo.recompensasRecentes}
                 onOpenReward={setRecompensaAberta}
                 onSeeStatement={() => setView("extrato")}
+                pacienteNome={pacienteNome}
               />
             </Animated.View>
 
             <View style={styles.disclaimer}>
               <Info size={14} color="#4F6982" />
               <Text style={styles.disclaimerText}>
-                XP e conquistas acompanham seu uso do app. Elas não substituem a orientação da
-                sua equipe de saúde.
+                {pacienteNome
+                  ? `XP e conquistas acompanham o uso do app por ${pacienteNome}. Elas não substituem a orientação da equipe de saúde.`
+                  : "XP e conquistas acompanham seu uso do app. Elas não substituem a orientação da sua equipe de saúde."}
               </Text>
             </View>
           </>
@@ -323,6 +378,27 @@ const styles = StyleSheet.create({
     color: "#35506B",
     fontSize: 14,
     lineHeight: 20,
+  },
+  centeredText: {
+    textAlign: "center",
+  },
+  centeredButton: {
+    alignSelf: "center",
+  },
+  watchingBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: "#E6EFFA",
+  },
+  watchingText: {
+    flex: 1,
+    color: "#12314C",
+    fontSize: 14,
+    fontWeight: "700",
   },
   staleBanner: {
     flexDirection: "row",

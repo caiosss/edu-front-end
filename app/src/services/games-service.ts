@@ -255,10 +255,19 @@ export const submitRoundResult = async (
   }
 };
 
-/** `GET /jogos/rodadas?limite=` */
-export const fetchRoundHistory = async (limite = 5): Promise<RodadaResumo[]> => {
+/**
+ * `GET /jogos/rodadas?limite=`. Com `pacienteId`, o historico desse paciente para o cuidador com
+ * VER_PROGRESSO (`/jogos/pacientes/{id}/rodadas`) — so leitura, o cuidador nao joga.
+ */
+export const fetchRoundHistory = async (
+  limite = 5,
+  pacienteId?: string | null
+): Promise<RodadaResumo[]> => {
   try {
-    const response = await api.get("/jogos/rodadas", { params: { limite } });
+    const rota = pacienteId
+      ? `/jogos/pacientes/${encodeURIComponent(pacienteId)}/rodadas`
+      : "/jogos/rodadas";
+    const response = await api.get(rota, { params: { limite } });
 
     if (!Array.isArray(response.data)) {
       throw new Error("Resposta de histórico de jogos inválida.");

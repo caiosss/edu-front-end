@@ -13,8 +13,11 @@ type UseRewardStatementResult = {
   loadMore: () => Promise<void>;
 };
 
-/** `GET /gamification/extrato`, pagina por pagina. */
-export function useRewardStatement(enabled: boolean): UseRewardStatementResult {
+/** `GET /gamification/extrato`, pagina por pagina. Com `pacienteId`, o do paciente acompanhado. */
+export function useRewardStatement(
+  enabled: boolean,
+  pacienteId: string | null = null
+): UseRewardStatementResult {
   const [linhas, setLinhas] = useState<ExtratoLinha[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -33,7 +36,7 @@ export function useRewardStatement(enabled: boolean): UseRewardStatementResult {
     setErrorMessage("");
 
     try {
-      const pagina = await fetchRewardStatement(0);
+      const pagina = await fetchRewardStatement(0, pacienteId);
 
       if (requestId !== requestRef.current) {
         return;
@@ -53,7 +56,7 @@ export function useRewardStatement(enabled: boolean): UseRewardStatementResult {
         setIsLoading(false);
       }
     }
-  }, [enabled]);
+  }, [enabled, pacienteId]);
 
   const loadMore = useCallback(async () => {
     if (!enabled || isLoading || isLoadingMore || !hasMore) {
@@ -64,7 +67,7 @@ export function useRewardStatement(enabled: boolean): UseRewardStatementResult {
     setIsLoadingMore(true);
 
     try {
-      const pagina = await fetchRewardStatement(nextPageRef.current);
+      const pagina = await fetchRewardStatement(nextPageRef.current, pacienteId);
 
       if (requestId !== requestRef.current) {
         return;
@@ -80,7 +83,7 @@ export function useRewardStatement(enabled: boolean): UseRewardStatementResult {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [enabled, hasMore, isLoading, isLoadingMore]);
+  }, [enabled, hasMore, isLoading, isLoadingMore, pacienteId]);
 
   useEffect(() => {
     void refresh();
