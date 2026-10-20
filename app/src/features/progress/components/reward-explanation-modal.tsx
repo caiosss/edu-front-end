@@ -5,7 +5,7 @@ import { BookOpen, CalendarDays, HeartHandshake, Star } from "lucide-react-nativ
 import { goldGradient } from "../../gamification/theme";
 import type { ExtratoLinha } from "../../gamification/types";
 import { capitalize, formatDateTimeBr } from "../../gamification/utils/format";
-import { describeRewardOrigin } from "../labels";
+import { describeRewardOrigin, describeRewardRule } from "../labels";
 
 type RewardExplanationModalProps = {
   linha: ExtratoLinha | null;
@@ -89,7 +89,7 @@ export function RewardExplanationModal({ linha, onClose }: RewardExplanationModa
               <ExplanationSection
                 icon={<BookOpen size={18} color="#1A5DB5" />}
                 title="Regra aplicada"
-                value={`${linha.regraCodigo || "Regra do catálogo"} (versão ${linha.regraVersao})`}
+                value={`${describeRewardRule(linha.regraCodigo)} · versão ${linha.regraVersao}`}
                 delay={200}
               />
               {quando ? (
