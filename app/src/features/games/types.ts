@@ -1,8 +1,18 @@
 /** `Jogo` do education-service (SPEC-012 §3, SPEC-013 §3). */
 export type Jogo = "MULTIPLA_ESCOLHA" | "ASSOCIACAO" | "MEU_DIA" | "ARRUME_A_MALA";
 
-/** Sobre o que a pergunta e. Os dois ultimos sao dos jogos de rotina (SPEC-013). */
-export type CampoPergunta = "FREQUENCIA" | "HORARIOS" | "HORARIO_DOSE" | "ITEM_MALA";
+/**
+ * Sobre o que a pergunta e. `HORARIO_DOSE` e `ITEM_MALA` sao dos jogos de rotina (SPEC-013).
+ * `DIAS` (dias da semana) e `DOSE` (quanto tomar num horario) vieram com a prescricao por
+ * horarios; `FREQUENCIA` ("a cada quantas horas") so aparece em rodada antiga.
+ */
+export type CampoPergunta =
+  | "FREQUENCIA"
+  | "HORARIOS"
+  | "HORARIO_DOSE"
+  | "ITEM_MALA"
+  | "DIAS"
+  | "DOSE";
 
 /** `CategoriaMissao`, copia do contrato do mission-service (SPEC-013 §5.2). */
 export type CategoriaMissao =

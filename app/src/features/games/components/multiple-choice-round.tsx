@@ -120,8 +120,8 @@ function OptionButton({
 }
 
 /**
- * Multipla escolha (SPEC-012 §5.2): uma pergunta por vez, tres opcoes. Corrige na hora com o
- * feedback pronto do backend; nada aqui fala em erro.
+ * Multipla escolha (SPEC-012 §5.2): uma pergunta por vez, tres opcoes (a de dose pode vir com
+ * duas). Corrige na hora com o feedback pronto do backend; nada aqui fala em erro.
  */
 export function MultipleChoiceRound({ rodada, onFinish, onExit }: MultipleChoiceRoundProps) {
   const { width } = useWindowDimensions();

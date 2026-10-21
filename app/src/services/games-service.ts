@@ -16,7 +16,14 @@ import { api, extractApiErrorMessage } from "./api";
 import { ERROR_MESSAGES, FriendlyError } from "../utils/friendly-error";
 
 const JOGOS: readonly Jogo[] = ["MULTIPLA_ESCOLHA", "ASSOCIACAO", "MEU_DIA", "ARRUME_A_MALA"];
-const CAMPOS: readonly CampoPergunta[] = ["FREQUENCIA", "HORARIOS", "HORARIO_DOSE", "ITEM_MALA"];
+const CAMPOS: readonly CampoPergunta[] = [
+  "FREQUENCIA",
+  "HORARIOS",
+  "HORARIO_DOSE",
+  "ITEM_MALA",
+  "DIAS",
+  "DOSE",
+];
 const CATEGORIAS: readonly CategoriaMissao[] = [
   "ATIVIDADE_FISICA",
   "HIDRATACAO",
