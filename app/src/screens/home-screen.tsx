@@ -81,17 +81,19 @@ const mapMedicationMissionToChecklistItem = (
   scheduleInfo: MedicationScheduleInfo
 ): ChecklistItem => {
   const subtitleParts: string[] = [];
+  // A dose e a do horario vigente: o mesmo remedio pode ser 2 comprimidos de manha e 1 a noite.
+  const doseLabel = scheduleInfo.doseLabel || mission.dosagem.trim();
 
-  if (mission.dosagem.trim()) {
-    subtitleParts.push(mission.dosagem.trim());
+  if (doseLabel) {
+    subtitleParts.push(doseLabel);
   }
 
   if (scheduleInfo.scheduledTimeLabel) {
     subtitleParts.push(scheduleInfo.scheduledTimeLabel);
   }
 
-  if (mission.frequenciaHoras > 0) {
-    subtitleParts.push(`a cada ${mission.frequenciaHoras}h`);
+  if (scheduleInfo.weekdaysLabel) {
+    subtitleParts.push(scheduleInfo.weekdaysLabel);
   }
 
   return {
@@ -223,16 +225,7 @@ export default function HomeScreen() {
     }
 
     missions.missoesMedicamento.forEach((mission) => {
-      scheduleById.set(
-        mission.id,
-        getMedicationScheduleInfo(
-          mission.id,
-          mission.horarioPrimeiraDose,
-          mission.frequenciaHoras,
-          mission.concluida,
-          currentDate
-        )
-      );
+      scheduleById.set(mission.id, getMedicationScheduleInfo(mission, currentDate));
     });
 
     return scheduleById;
@@ -263,10 +256,35 @@ export default function HomeScreen() {
     }
   }, [doseSlotsSignature, refreshHomeMissions]);
 
+  /** So os remedios com dose hoje entram no checklist e no progresso do dia. */
   const activeMedicationMissions = useMemo(
-    () => missions?.missoesMedicamento.filter((mission) => mission.ativo) ?? [],
-    [missions]
+    () =>
+      missions?.missoesMedicamento.filter(
+        (mission) =>
+          mission.ativo && medicationScheduleById.get(mission.id)?.status !== "off-day"
+      ) ?? [],
+    [medicationScheduleById, missions]
   );
+
+  /** "Hoje sem dose: Metotrexato (na quarta às 8h)." Vazio quando todos tem dose hoje. */
+  const offDayMedicationNote = useMemo(() => {
+    const offDay =
+      missions?.missoesMedicamento.filter(
+        (mission) =>
+          mission.ativo && medicationScheduleById.get(mission.id)?.status === "off-day"
+      ) ?? [];
+
+    if (offDay.length === 0) {
+      return "";
+    }
+
+    const names = offDay.map((mission) => {
+      const next = medicationScheduleById.get(mission.id)?.offDayLabel;
+      return next ? `${mission.nomeMedicamento} (${next})` : mission.nomeMedicamento;
+    });
+
+    return `Hoje sem dose: ${names.join(", ")}.`;
+  }, [medicationScheduleById, missions]);
 
   const medicationItems = useMemo(
     () =>
@@ -535,6 +553,10 @@ export default function HomeScreen() {
       return "Carregando seus medicamentos de hoje...";
     }
 
+    if (medicationItems.length === 0 && offDayMedicationNote) {
+      return "Hoje não há doses previstas.";
+    }
+
     if (hasOverdueMedication) {
       return "Confira os medicamentos em vermelho: o horário já passou.";
     }
@@ -562,7 +584,9 @@ export default function HomeScreen() {
     errorMessage,
     hasOverdueMedication,
     isLoading,
+    medicationItems.length,
     missions,
+    offDayMedicationNote,
   ]);
 
   const missionDescription = useMemo(() => {
@@ -679,6 +703,7 @@ export default function HomeScreen() {
               loadingIds={completingMedicationItemIds}
               disabledIds={blockedMedicationItemIds}
               onToggleItem={toggleMedication}
+              footnote={offDayMedicationNote || undefined}
             />
           </Animated.View>
 

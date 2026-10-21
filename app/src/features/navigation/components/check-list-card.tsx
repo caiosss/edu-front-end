@@ -38,6 +38,8 @@ type ChecklistCardProps = {
   loadingIds?: string[];
   disabledIds?: string[];
   onToggleItem: (itemId: string) => void;
+  /** Texto de apoio depois da lista (ex.: remedios que nao tem dose hoje). */
+  footnote?: string;
 };
 
 function ChecklistNotice({ notice }: { notice: ChecklistItemNotice }) {
@@ -81,6 +83,7 @@ export default function ChecklistCard({
   loadingIds = [],
   disabledIds = [],
   onToggleItem,
+  footnote,
 }: ChecklistCardProps) {
   return (
     <View style={styles.card}>
@@ -164,6 +167,8 @@ export default function ChecklistCard({
           );
         })}
       </View>
+
+      {footnote ? <Text style={styles.footnote}>{footnote}</Text> : null}
     </View>
   );
 }
@@ -234,6 +239,11 @@ const styles = StyleSheet.create({
   },
   checklistGroup: {
     gap: 10,
+  },
+  footnote: {
+    fontSize: 16,
+    color: "#48627A",
+    lineHeight: 22,
   },
   checklistRow: {
     borderRadius: 12,

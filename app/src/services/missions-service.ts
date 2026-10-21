@@ -9,11 +9,15 @@ import type {
 import type {
   AutorRegistro,
   CompleteMissionPayload,
+  DiaSemana,
+  DoseDeHoje,
   DoseRegistrada,
   GeneralMissionResponse,
+  HorarioDose,
   MedicationMissionResponse,
   MyMissionsResponse,
 } from "../features/home/types";
+import { getDailyDoseTimes, parseDoseTime } from "../features/home/utils/medication-schedule";
 import { api, extractApiErrorMessage } from "./api";
 import { resolveCurrentPatientId } from "./patient-service";
 import { ERROR_MESSAGES, FriendlyError } from "../utils/friendly-error";
@@ -115,10 +119,10 @@ const normalizePrescriptionItems = (data: unknown): MedicationMissionResponse[] 
     const item = asObject(rawItem);
     const id = asNonEmptyString(item?.id);
     const nomeMedicamento = asNonEmptyString(item?.nomeMedicamento);
-    const frequenciaHoras = asNonNegativeInteger(item?.frequenciaHoras);
-    const horarioPrimeiraDose = asNonEmptyString(item?.horarioPrimeiraDose);
+    const dosagem = asString(item?.dosagem) ?? "";
+    const horarios = item ? normalizeHorarios(item, dosagem) : [];
 
-    if (!item || !id || !nomeMedicamento || frequenciaHoras === null || !horarioPrimeiraDose) {
+    if (!item || !id || !nomeMedicamento || horarios.length === 0) {
       throw new Error("Resposta de itens de prescrição inválida.");
     }
 
@@ -129,12 +133,72 @@ const normalizePrescriptionItems = (data: unknown): MedicationMissionResponse[] 
       nomePaciente,
       nomeMedicamento,
       tipoMedicamento: asString(item.tipoMedicamento) ?? "",
-      dosagem: asString(item.dosagem) ?? "",
-      frequenciaHoras,
-      horarioPrimeiraDose,
+      dosagem,
+      horarios,
+      diasSemana: normalizeDiasSemana(item.diasSemana),
+      dosesDeHoje: normalizeDosesDeHoje(item.dosesDeHoje),
       ativo,
       concluida: asBoolean(item.concluido) ?? false,
     };
+  });
+};
+
+const DIAS_SEMANA: readonly DiaSemana[] = [
+  "SEGUNDA",
+  "TERCA",
+  "QUARTA",
+  "QUINTA",
+  "SEXTA",
+  "SABADO",
+  "DOMINGO",
+];
+
+const asHorarioDose = (value: unknown): HorarioDose | null => {
+  const horario = asObject(value);
+  const hora = asNonEmptyString(horario?.horario);
+  return hora && parseDoseTime(hora) ? { horario: hora, dosagem: asString(horario?.dosagem) ?? "" } : null;
+};
+
+/**
+ * Os horarios do item, cada um com a sua dose. Backend anterior aos horarios so manda
+ * `horarioPrimeiraDose` e `frequenciaHoras`: os horarios saem dai, todos com a mesma dose.
+ */
+const normalizeHorarios = (item: Record<string, unknown>, dosagem: string): HorarioDose[] => {
+  if (Array.isArray(item.horarios) && item.horarios.length > 0) {
+    return item.horarios.flatMap((horario) => {
+      const parsed = asHorarioDose(horario);
+      return parsed ? [parsed] : [];
+    });
+  }
+
+  const primeira = parseDoseTime(asNonEmptyString(item.horarioPrimeiraDose) ?? "");
+  const frequenciaHoras = asNonNegativeInteger(item.frequenciaHoras);
+
+  if (!primeira || frequenciaHoras === null) {
+    return [];
+  }
+
+  return getDailyDoseTimes(primeira, frequenciaHoras).map((time) => ({
+    horario: `${String(time.hours).padStart(2, "0")}:${String(time.minutes).padStart(2, "0")}`,
+    dosagem,
+  }));
+};
+
+/** Vazio = todos os dias: e o que um item sem dias significa no backend. */
+const normalizeDiasSemana = (value: unknown): DiaSemana[] =>
+  Array.isArray(value)
+    ? DIAS_SEMANA.filter((dia) => value.includes(dia))
+    : [];
+
+/** Nulo quando o backend nao manda: a Home cai no `concluido` da dose atual. */
+const normalizeDosesDeHoje = (value: unknown): DoseDeHoje[] | null => {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  return value.flatMap((dose) => {
+    const horario = asHorarioDose(dose);
+    return horario ? [{ ...horario, registrada: asBoolean(asObject(dose)?.registrada) ?? false }] : [];
   });
 };
 

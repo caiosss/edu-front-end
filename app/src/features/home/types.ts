@@ -19,15 +19,42 @@ export type PlanoMissaoResponse = {
   itens: PlanoMissaoItemResponse[];
 };
 
-/** `PrescricaoItemResponseDTO` */
+/** `DiaSemana` do mission-service, com segunda primeiro. */
+export type DiaSemana =
+  | "SEGUNDA"
+  | "TERCA"
+  | "QUARTA"
+  | "QUINTA"
+  | "SEXTA"
+  | "SABADO"
+  | "DOMINGO";
+
+/** Um horario do dia ("06:00") e a dose dele: o mesmo remedio pode ter doses diferentes. */
+export type HorarioDose = {
+  horario: string;
+  dosagem: string;
+};
+
+/** Uma dose de hoje e se ela ja foi registrada (`DoseDeHojeDTO`). */
+export type DoseDeHoje = HorarioDose & {
+  registrada: boolean;
+};
+
+/**
+ * `PrescricaoItemResponseDTO`. A posologia e `horarios` + `diasSemana`; `dosagem` e so o resumo
+ * para listagens, e `frequenciaHoras` so existe em prescricao antiga.
+ */
 export type PrescricaoItemResponse = {
   id: string;
   medicamentoId: string;
   nomeMedicamento: string;
   tipoMedicamento: string;
   dosagem: string;
-  frequenciaHoras: number;
+  frequenciaHoras: number | null;
   horarioPrimeiraDose: string;
+  horarios: HorarioDose[];
+  diasSemana: DiaSemana[];
+  dosesDeHoje: DoseDeHoje[];
   concluido: boolean;
 };
 
@@ -63,6 +90,10 @@ export type GeneralMissionResponse = {
 /**
  * Item de prescricao achatado para a Home. `id` e o id do **item da prescricao**
  * (`prescricaoItemId`). `concluida` significa "a dose prevista agora ja foi registrada".
+ *
+ * `horarios` nunca vem vazio: para backend antigo, sai derivado de `horarioPrimeiraDose` e
+ * `frequenciaHoras`. `diasSemana` vazio = todos os dias. `dosesDeHoje` nulo = o backend nao
+ * mandou, e vale `concluida`.
  */
 export type MedicationMissionResponse = {
   id: string;
@@ -72,8 +103,9 @@ export type MedicationMissionResponse = {
   nomeMedicamento: string;
   tipoMedicamento: string;
   dosagem: string;
-  frequenciaHoras: number;
-  horarioPrimeiraDose: string;
+  horarios: HorarioDose[];
+  diasSemana: DiaSemana[];
+  dosesDeHoje: DoseDeHoje[] | null;
   ativo: boolean;
   concluida: boolean;
 };
