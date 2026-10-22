@@ -1,26 +1,7 @@
 import { useState } from "react";
 import { Platform, View, type StyleProp, type ViewStyle } from "react-native";
 import { StatusBanner } from "../../components/ui";
-
-/** Aberto pelo icone da Tela de Inicio (ou instalado pelo Chrome), e nao numa aba do navegador? */
-const isStandalone = (): boolean => {
-  if (Platform.OS !== "web" || typeof window === "undefined") {
-    return true;
-  }
-  const navegador = window.navigator as Navigator & { standalone?: boolean };
-  return (
-    navegador.standalone === true ||
-    window.matchMedia?.("(display-mode: standalone)").matches === true
-  );
-};
-
-const isIos = (): boolean => {
-  const navegador = window.navigator;
-  return (
-    /iPhone|iPad|iPod/.test(navegador.userAgent) ||
-    (navegador.platform === "MacIntel" && navegador.maxTouchPoints > 1)
-  );
-};
+import { isIos, isStandalone } from "./standalone";
 
 type InstallHintProps = {
   style?: StyleProp<ViewStyle>;

@@ -8,6 +8,13 @@ import {
   marcarNotificacaoAberta,
   registrarAparelho,
 } from "../services/push-service";
+import {
+  ouvirToqueWeb,
+  pedirPermissaoWeb,
+  permissaoWeb,
+  registrarServiceWorker,
+  webPushDisponivel,
+} from "../services/web-push";
 import { useAuthStore } from "../store/auth-store";
 import { usePushStore } from "../store/push-store";
 import { toFriendlyMessage } from "../utils/friendly-error";
@@ -53,7 +60,8 @@ export function usePushNotifications({ onAbrirNotificacao }: Opcoes) {
 
   /** Abre o termo se o paciente ainda nao autorizou. Sem resposta do backend, nao insiste. */
   const conferirTermo = useCallback(async () => {
-    if (!ehPaciente || Platform.OS !== "android") {
+    // iPhone nativo nao tem push (exigiria a conta paga da Apple); a versao web tem.
+    if (!ehPaciente || Platform.OS === "ios") {
       return;
     }
     try {
@@ -78,10 +86,42 @@ export function usePushNotifications({ onAbrirNotificacao }: Opcoes) {
   }, [ehPaciente]);
 
   useEffect(() => {
-    // Na versao web (iPhone pela Tela de Inicio) ainda nao ha push, e o que este efeito usa do
-    // expo-notifications (ultima resposta, ouvintes de token e de toque) nao existe no navegador.
+    // Versao web (iPhone pela Tela de Inicio): Web Push pelo service worker. O que o efeito
+    // nativo usa do expo-notifications (ultima resposta, ouvintes de token e de toque) nao existe
+    // no navegador. Numa aba comum do Safari nao ha push: o aviso de instalar cobre esse caso.
     if (Platform.OS === "web") {
-      return;
+      if (!webPushDisponivel()) {
+        return;
+      }
+      let ativo = true;
+      const pararDeOuvir = ouvirToqueWeb((notificacaoId) => {
+        if (notificacaoId) {
+          marcarNotificacaoAberta(notificacaoId).catch(() => undefined);
+        }
+        onAbrirRef.current();
+      });
+
+      (async () => {
+        try {
+          await registrarServiceWorker();
+        } catch (erro) {
+          console.warn("Nao foi possivel registrar o service worker", erro);
+          return;
+        }
+        if (!ativo) return;
+        const permissao = permissaoWeb();
+        if (permissao === "granted") {
+          await registrar();
+          if (ativo) await conferirTermo();
+        } else if (permissao === "default") {
+          setConvitePendente(true);
+        }
+      })();
+
+      return () => {
+        ativo = false;
+        pararDeOuvir();
+      };
     }
 
     let ativo = true;
@@ -128,8 +168,12 @@ export function usePushNotifications({ onAbrirNotificacao }: Opcoes) {
 
   const aceitarConvite = useCallback(async () => {
     setConvitePendente(false);
-    const resposta = await Notifications.requestPermissionsAsync();
-    if (resposta.granted) {
+    // Na web o pedido sai aqui, ainda dentro do toque no "Sim": o iPhone so pergunta assim.
+    const permitido =
+      Platform.OS === "web"
+        ? (await pedirPermissaoWeb()) === "granted"
+        : (await Notifications.requestPermissionsAsync()).granted;
+    if (permitido) {
       await registrar();
       await conferirTermo();
     }

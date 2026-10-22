@@ -1,6 +1,7 @@
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import { api } from "./api";
+import { inscreverNoWebPush } from "./web-push";
 
 /**
  * Notificacoes push (SPEC-005). O backend (notification-service) agenda e envia pelo Firebase;
@@ -58,11 +59,13 @@ export async function configurarNotificacoes() {
 
 /**
  * Registra este aparelho para o usuario logado e devolve o id do registro (usado no logout).
- * So Android por enquanto: no iPhone o token e do APNs, que exige a conta paga da Apple, e o
- * backend envia apenas pelo FCM.
+ *
+ * Android: token do FCM. Versao web (PWA no iPhone): a inscricao de Web Push, com o endpoint no
+ * lugar do token e as chaves para o backend cifrar. App nativo no iPhone fica de fora: o token
+ * seria do APNs, que exige a conta paga da Apple.
  */
 export async function registrarAparelho(): Promise<string | null> {
-  if (Platform.OS !== "android") {
+  if (Platform.OS !== "android" && Platform.OS !== "web") {
     return null;
   }
 
@@ -74,15 +77,16 @@ export async function registrarAparelho(): Promise<string | null> {
   }
 
   registroEmAndamento = (async () => {
-    const { data: token } = await Notifications.getDevicePushTokenAsync();
+    const corpo = await corpoDoRegistro();
+    if (!corpo) {
+      return null;
+    }
+    const { token } = corpo;
     // Mesmo token ja registrado nesta sessao: nada a mandar.
     if (ultimoRegistro && ultimoRegistro.token === token) {
       return ultimoRegistro.id;
     }
-    const resposta = await api.post<{ id: string }>("/notificacoes/dispositivos", {
-      token,
-      plataforma: "ANDROID",
-    });
+    const resposta = await api.post<{ id: string }>("/notificacoes/dispositivos", corpo);
     const id = resposta.data?.id ?? null;
     ultimoRegistro = id ? { token, id } : null;
     return id;
@@ -93,6 +97,23 @@ export async function registrarAparelho(): Promise<string | null> {
   } finally {
     registroEmAndamento = null;
   }
+}
+
+/** O que vai para `POST /notificacoes/dispositivos`; nulo quando nao ha o que registrar. */
+async function corpoDoRegistro() {
+  if (Platform.OS === "web") {
+    const inscricao = await inscreverNoWebPush();
+    return inscricao
+      ? {
+          token: inscricao.endpoint,
+          plataforma: "WEB",
+          p256dh: inscricao.p256dh,
+          auth: inscricao.auth,
+        }
+      : null;
+  }
+  const { data: token } = await Notifications.getDevicePushTokenAsync();
+  return { token: token as string, plataforma: "ANDROID" };
 }
 
 let registroEmAndamento: Promise<string | null> | null = null;
