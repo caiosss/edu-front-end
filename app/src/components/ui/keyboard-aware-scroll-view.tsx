@@ -36,6 +36,12 @@ export function useScrollToFocusedInput(): () => void {
 
 const noop = () => undefined;
 
+/**
+ * No navegador quem rola ate o campo focado e o proprio Safari, e o react-native-web nao tem
+ * `TextInput.State.currentlyFocusedInput` (chamar estourava a cada toque num campo).
+ */
+const IS_WEB = Platform.OS === "web";
+
 type KeyboardAwareScrollViewProps = ScrollViewProps & {
   children: ReactNode;
 };
@@ -133,7 +139,7 @@ export function KeyboardAwareScrollView({
   }, [contentContainerStyle]);
 
   return (
-    <ScrollToFocusedInputContext.Provider value={scheduleScrollToFocusedInput}>
+    <ScrollToFocusedInputContext.Provider value={IS_WEB ? noop : scheduleScrollToFocusedInput}>
       <ScrollView
         {...props}
         ref={scrollRef}

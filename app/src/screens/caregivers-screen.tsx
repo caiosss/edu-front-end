@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { ShieldCheck, UserPlus } from "lucide-react-native";
 import {
@@ -26,6 +26,7 @@ import {
 } from "../services/caregiver-service";
 import { fetchConsentTerm, grantConsent, revokeConsent } from "../services/consent-service";
 import { colors, spacing } from "../theme";
+import { confirmAction } from "../utils/confirm-action";
 import { toFriendlyMessage } from "../utils/friendly-error";
 
 /** Limite do auth-service: convidados e ativos ocupam vaga (SPEC-014 §3). */
@@ -172,18 +173,14 @@ export default function CaregiversScreen({
   };
 
   const confirmRemove = (caregiver: CaregiverLink) => {
-    Alert.alert(
-      `Remover ${caregiver.nomeCompleto}?`,
-      "Essa pessoa não vai mais conseguir entrar no aplicativo. O que ela já registrou fica guardado.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Remover",
-          style: "destructive",
-          onPress: () => void remove(caregiver),
-        },
-      ]
-    );
+    confirmAction({
+      title: `Remover ${caregiver.nomeCompleto}?`,
+      message:
+        "Essa pessoa não vai mais conseguir entrar no aplicativo. O que ela já registrou fica guardado.",
+      confirmLabel: "Remover",
+      destructive: true,
+      onConfirm: () => void remove(caregiver),
+    });
   };
 
   const remove = async (caregiver: CaregiverLink) => {
@@ -205,18 +202,14 @@ export default function CaregiversScreen({
   };
 
   const confirmRevokeDelegation = () => {
-    Alert.alert(
-      "Retirar a autorização?",
-      "Nenhum cuidador vai mais registrar doses ou atividades por você. O que eles podem ver continua igual.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Retirar",
-          style: "destructive",
-          onPress: () => void revokeDelegation(),
-        },
-      ]
-    );
+    confirmAction({
+      title: "Retirar a autorização?",
+      message:
+        "Nenhum cuidador vai mais registrar doses ou atividades por você. O que eles podem ver continua igual.",
+      confirmLabel: "Retirar",
+      destructive: true,
+      onConfirm: () => void revokeDelegation(),
+    });
   };
 
   const revokeDelegation = async () => {

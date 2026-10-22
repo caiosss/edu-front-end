@@ -66,7 +66,8 @@ export function DateInput({
       control={control}
       name={name}
       render={({ field: { onChange, value }, fieldState: { error } }) => {
-        if (!NativeDateTimePicker) {
+        // O seletor nativo nao existe no navegador (versao web do iPhone): la vale o campo digitado.
+        if (!NativeDateTimePicker || Platform.OS === "web") {
           return (
             <View style={styles.wrapper}>
               <Text style={styles.label}>{label}</Text>

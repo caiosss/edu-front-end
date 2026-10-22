@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ComponentType } from "react";
 import {
   ActivityIndicator,
-  Alert,
   BackHandler,
   Pressable,
   RefreshControl,
@@ -35,6 +34,7 @@ import {
   startGameRound,
   submitRoundResult,
 } from "../services/games-service";
+import { confirmAction } from "../utils/confirm-action";
 import { createIdempotencyKey } from "../utils/idempotency-key";
 import { toFriendlyMessage } from "../utils/friendly-error";
 
@@ -127,15 +127,13 @@ export default function GamesScreen() {
   );
 
   const confirmarSaida = useCallback(() => {
-    Alert.alert(
-      "Sair da rodada?",
-      "As respostas desta rodada não serão registradas.",
-      [
-        { text: "Continuar treinando", style: "cancel" },
-        { text: "Sair", onPress: () => setFase({ tipo: "lobby" }) },
-      ],
-      { cancelable: true }
-    );
+    confirmAction({
+      title: "Sair da rodada?",
+      message: "As respostas desta rodada não serão registradas.",
+      confirmLabel: "Sair",
+      cancelLabel: "Continuar treinando",
+      onConfirm: () => setFase({ tipo: "lobby" }),
+    });
   }, []);
 
   useEffect(() => {
@@ -182,7 +180,7 @@ export default function GamesScreen() {
           <Text style={styles.infoTitle}>Disponível para pacientes</Text>
           <Text style={styles.supportingText}>
             Os jogos usam a prescrição e o plano de cuidado de cada paciente para treinar
-            horários, intervalos e a rotina do dia.
+            horários, dias, doses e a rotina do dia.
           </Text>
         </View>
       </View>

@@ -1,0 +1,2 @@
+# Script de shell com fim de linha CRLF quebra no bash (o "\r" vira parte dos comandos).
+*.sh text eol=lf

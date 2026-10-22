@@ -78,6 +78,12 @@ export function usePushNotifications({ onAbrirNotificacao }: Opcoes) {
   }, [ehPaciente]);
 
   useEffect(() => {
+    // Na versao web (iPhone pela Tela de Inicio) ainda nao ha push, e o que este efeito usa do
+    // expo-notifications (ultima resposta, ouvintes de token e de toque) nao existe no navegador.
+    if (Platform.OS === "web") {
+      return;
+    }
+
     let ativo = true;
 
     const tratarToque = (resposta: Notifications.NotificationResponse) => {

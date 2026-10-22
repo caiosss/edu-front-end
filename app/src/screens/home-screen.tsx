@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, AppState, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AppState, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import {
   Bell,
@@ -34,10 +34,12 @@ import { useAuth } from "../hooks/useAuth";
 import { useCaregiverProfile } from "../hooks/use-caregiver-profile";
 import { useCompleteMission } from "../hooks/use-complete-mission";
 import { syncGamificationAfterReward, useGamification } from "../hooks/use-gamification";
+import { InstallHint } from "../features/pwa/install-hint";
 import { useHomeMissions } from "../hooks/use-home-missions";
 import { usePatientProfile } from "../hooks/use-patient-profile";
 import { useTodayDoses } from "../hooks/use-today-doses";
 import { useGamificationStore } from "../store/gamification-store";
+import { confirmAction } from "../utils/confirm-action";
 
 const DAILY_PROGRESS_GRADIENT = ["#63E6BE", "#20C997", "#2C7BE5"] as const;
 
@@ -493,14 +495,13 @@ export default function HomeScreen() {
   const confirmContestDose = (dose: DoseRegistrada) => {
     const medicationName = medicationNameByItemId.get(dose.prescricaoItemId) ?? "esta dose";
 
-    Alert.alert(
-      "Você não tomou esta dose?",
-      `A dose de ${medicationName} sai das doses tomadas de hoje. Ela não poderá ser registrada de novo.`,
-      [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Não tomei", style: "destructive", onPress: () => void contest(dose.id) },
-      ]
-    );
+    confirmAction({
+      title: "Você não tomou esta dose?",
+      message: `A dose de ${medicationName} sai das doses tomadas de hoje. Ela não poderá ser registrada de novo.`,
+      confirmLabel: "Não tomei",
+      destructive: true,
+      onConfirm: () => void contest(dose.id),
+    });
   };
 
   const dailyProgress = useMemo(() => {
@@ -628,6 +629,8 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+      <InstallHint />
+
       <Animated.View entering={FadeInDown.duration(220)} style={styles.heroCard}>
         <View style={styles.heroHeader}>
           <View style={styles.heroTitleBlock}>

@@ -1,4 +1,5 @@
 import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
 import { decodeTokenPayload } from "../utils/jwt";
 
 /**
@@ -7,6 +8,10 @@ import { decodeTokenPayload } from "../utils/jwt";
  * Vai no `expo-secure-store` (Keystore no Android, Keychain no iOS), nunca em armazenamento
  * comum: o token da acesso a dados de saude. Falha de leitura ou escrita so faz o app pedir o
  * login de novo; nunca derruba a tela.
+ *
+ * No navegador (versao web instalada na Tela de Inicio do iPhone) nao existe secure-store: a
+ * sessao vai no `localStorage` da origem do app, que so o proprio app le. E menos protegido que o
+ * Keychain, mas e o que a web oferece; sem isso o paciente faria login a cada abertura.
  */
 export type SessaoGuardada = {
   token: string;
@@ -15,6 +20,15 @@ export type SessaoGuardada = {
 };
 
 const CHAVE = "educare.sessao";
+
+/** Mesma interface do secure-store; na web, o `localStorage` (que pode estar bloqueado). */
+const armazenamento = Platform.OS === "web"
+  ? {
+      getItemAsync: async (chave: string) => window.localStorage.getItem(chave),
+      setItemAsync: async (chave: string, valor: string) => window.localStorage.setItem(chave, valor),
+      deleteItemAsync: async (chave: string) => window.localStorage.removeItem(chave),
+    }
+  : SecureStore;
 
 /** Folga para nao entrar com um token que vence nos proximos segundos. */
 const MARGEM_EXPIRACAO_MS = 60_000;
@@ -27,7 +41,7 @@ export const tokenValido = (token: string | null, agora = Date.now()): boolean =
 
 export async function carregarSessao(): Promise<SessaoGuardada | null> {
   try {
-    const bruto = await SecureStore.getItemAsync(CHAVE);
+    const bruto = await armazenamento.getItemAsync(CHAVE);
     if (!bruto) {
       return null;
     }
@@ -53,7 +67,7 @@ export async function carregarSessao(): Promise<SessaoGuardada | null> {
 
 export async function guardarSessao(sessao: SessaoGuardada): Promise<void> {
   try {
-    await SecureStore.setItemAsync(CHAVE, JSON.stringify(sessao));
+    await armazenamento.setItemAsync(CHAVE, JSON.stringify(sessao));
   } catch (erro) {
     console.warn("Nao foi possivel guardar a sessao", erro);
   }
@@ -61,7 +75,7 @@ export async function guardarSessao(sessao: SessaoGuardada): Promise<void> {
 
 export async function apagarSessao(): Promise<void> {
   try {
-    await SecureStore.deleteItemAsync(CHAVE);
+    await armazenamento.deleteItemAsync(CHAVE);
   } catch (erro) {
     console.warn("Nao foi possivel apagar a sessao guardada", erro);
   }

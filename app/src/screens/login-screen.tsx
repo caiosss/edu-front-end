@@ -13,6 +13,7 @@ import { useForm } from "react-hook-form";
 import { KeyboardAwareScrollView, Logo } from "../components/ui";
 import { AnimatedActionButton } from "../features/login/components/animated-action-button";
 import { LoginInput } from "../features/login/components/login-input";
+import { InstallHint } from "../features/pwa/install-hint";
 import { useLoginController } from "../features/login/hooks/use-login-controller";
 import { loginDefaultValues, type LoginFormValues } from "../features/login/types";
 import { loginSchema } from "../features/login/validation";
@@ -59,6 +60,7 @@ export default function LoginScreen({
         contentContainerStyle={styles.scrollContainer}
       >
         <Logo width={180} style={styles.logo} />
+        <InstallHint style={[styles.installHint, { width: containerWidth }]} />
         <Animated.View
           entering={FadeInDown.duration(320)}
           style={[styles.card, { width: containerWidth }]}
@@ -159,6 +161,9 @@ const styles = StyleSheet.create({
   },
   logo: {
     marginBottom: 20,
+  },
+  installHint: {
+    marginBottom: 16,
   },
   scrollContainer: {
     flexGrow: 1,

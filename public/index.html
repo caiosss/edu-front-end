@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <!-- viewport-fit=cover: o app desenha atrás do notch e da barra de início, e o
+         react-native-safe-area-context recua o conteúdo pelos env(safe-area-inset-*). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>EduCare</title>
+    <meta name="description" content="Seus remédios, horários e cuidados do dia." />
+    <meta name="theme-color" content="#F4F7FB" />
+
+    <!-- Versão web instalada na Tela de Início do iPhone: abre em tela cheia, com nome e ícone
+         próprios. Sem isso o Safari abre como página comum. -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="EduCare" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <!-- Números de horário e dose não viram link de telefone. -->
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- Reset recomendado pelo react-native-web, mais o fundo do app (sem flash branco ao
+         abrir) e sem o "puxar e quicar" da página inteira. -->
+    <style id="expo-reset">
+      html,
+      body {
+        height: 100%;
+        background-color: #f4f7fb;
+      }
+      body {
+        overflow: hidden;
+        overscroll-behavior: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      #root {
+        display: flex;
+        height: 100%;
+        flex: 1;
+      }
+    </style>
+  </head>
+
+  <body>
+    <noscript>Ative o JavaScript para usar o EduCare.</noscript>
+    <div id="root"></div>
+  </body>
+</html>

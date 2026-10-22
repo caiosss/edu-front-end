@@ -27,7 +27,14 @@
       "googleServicesFile": "./google-services.json"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single",
+      "name": "EduCare",
+      "shortName": "EduCare",
+      "lang": "pt-BR",
+      "themeColor": "#F4F7FB",
+      "backgroundColor": "#F4F7FB"
     },
     "plugins": [
       "expo-router",
