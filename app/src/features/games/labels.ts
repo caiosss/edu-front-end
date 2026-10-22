@@ -37,13 +37,13 @@ type GameInfo = {
 export const GAME_INFO: Record<Jogo, GameInfo> = {
   MULTIPLA_ESCOLHA: {
     titulo: "Perguntas rápidas",
-    descricao: "Uma pergunta por vez sobre a frequência e os horários dos seus medicamentos.",
+    descricao: "Uma pergunta por vez sobre os horários, os dias e as doses dos seus medicamentos.",
     icon: ListChecks,
     cores: ["#4DABF7", "#1A6FD6"],
   },
   ASSOCIACAO: {
     titulo: "Ligue os pares",
-    descricao: "Ligue cada medicamento ao intervalo entre as doses ou aos seus horários.",
+    descricao: "Ligue cada medicamento aos seus horários ou aos dias em que você toma.",
     icon: Link2,
     cores: ["#9775FA", "#5F3DC4"],
   },
