@@ -596,22 +596,22 @@ export default function HomeScreen() {
     }
 
     if (errorMessage) {
-      return "Não foi possível carregar as recomendações de hoje.";
+      return "Não foi possível carregar as missões de hoje.";
     }
 
     if (isLoading && !missions) {
-      return "Carregando suas recomendações do dia...";
+      return "Carregando suas missões do dia...";
     }
 
     if (isReadOnly) {
-      return "Você pode acompanhar as recomendações do dia, mas não registrar.";
+      return "Você pode acompanhar as missões do dia, mas não registrar.";
     }
 
     if (isCaregiver) {
-      return `Marque as recomendações que ${patientFirstName ?? "a pessoa"} cumprir hoje.`;
+      return `Marque as missões que ${patientFirstName ?? "a pessoa"} cumprir hoje.`;
     }
 
-    return "Complete suas recomendações para ganhar XP e evoluir de nível.";
+    return "Complete suas missões para ganhar XP e evoluir de nível.";
   }, [
     isCaregiver,
     isReadOnly,
@@ -712,7 +712,7 @@ export default function HomeScreen() {
 
           <Animated.View entering={FadeInDown.delay(120).duration(240)}>
             <ChecklistCard
-              title="Recomendações do dia"
+              title="Missões do dia"
               description={missionDescription}
               items={dailyMissionItems}
               checkedIds={completedMissionIds}
