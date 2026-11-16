@@ -13,7 +13,6 @@ import {
   ChevronRight,
   Eye,
   Flame,
-  Gem,
   Heart,
   LockKeyhole,
   LogOut,
@@ -96,7 +95,7 @@ export default function ProfileScreen({ onNavigateToCaregivers }: ProfileScreenP
   const [accessibilityEnabled, setAccessibilityEnabled] = useState(false);
   const [isTermsVisible, setIsTermsVisible] = useState(false);
   // Progresso vem do gamification-service; o `/pacientes/me` so traz os dados cadastrais.
-  const { nivel: patientNivel, xpTotal, moedas, streak } = useGamification();
+  const { nivel: patientNivel, xpTotal, streak } = useGamification();
 
   const isProfileLoading = isCaregiverUser ? isCaregiverLoading : isPatientLoading;
   const profileErrorMessage = isCaregiverUser ? caregiverErrorMessage : patientErrorMessage;
@@ -231,20 +230,16 @@ export default function ProfileScreen({ onNavigateToCaregivers }: ProfileScreenP
               </View>
             </View>
 
-            <View style={styles.chipRow}>
-              <View style={styles.coinChip}>
-                <Gem size={14} color="#845EF7" />
-                <Text style={styles.coinText}>{moedas} moedas</Text>
-              </View>
-              {streak && streak.atual > 0 ? (
+            {streak && streak.atual > 0 ? (
+              <View style={styles.chipRow}>
                 <View style={styles.streakChip}>
                   <Flame size={14} color="#E8590C" />
                   <Text style={styles.streakText}>
                     Sequência: {streak.atual} {streak.atual === 1 ? "dia" : "dias"}
                   </Text>
                 </View>
-              ) : null}
-            </View>
+              </View>
+            ) : null}
           </Animated.View>
 
           {caregiverNames.length > 0 ? (
@@ -485,20 +480,6 @@ const styles = StyleSheet.create({
   },
   streakText: {
     color: "#7A3E00",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  coinChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    backgroundColor: "#F3F0FF",
-  },
-  coinText: {
-    color: "#5F3DC4",
     fontSize: 12,
     fontWeight: "700",
   },

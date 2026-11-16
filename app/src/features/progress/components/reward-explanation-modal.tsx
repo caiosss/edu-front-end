@@ -73,12 +73,6 @@ export function RewardExplanationModal({ linha, onClose }: RewardExplanationModa
               {linha.motivo ? capitalize(linha.motivo) : "Recompensa registrada"}
             </Text>
 
-            {linha.moedas > 0 ? (
-              <Text style={styles.moedas}>
-                +{linha.moedas} {linha.moedas === 1 ? "moeda" : "moedas"}
-              </Text>
-            ) : null}
-
             <View style={styles.sections}>
               <ExplanationSection
                 icon={<HeartHandshake size={18} color="#1A5DB5" />}
@@ -147,11 +141,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "700",
     textAlign: "center",
-  },
-  moedas: {
-    color: "#5F3DC4",
-    fontSize: 14,
-    fontWeight: "700",
   },
   sections: {
     alignSelf: "stretch",
